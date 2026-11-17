@@ -161,6 +161,7 @@
           h('div', { class: 'code-actions' }, [
             h('button', { class: 'btn ghost', type: 'button', text: 'Скопировать код', onClick: function () { copyText(data.room_code); } })
           ]),
+          playerFallback(data.room_code),
           h('p', { class: 'muted', id: 'question-count', text: questionCountText(data) }),
           h('div', { class: 'qr-grid' }, [
             qrCard('Игроки', 'Сканируйте, чтобы войти', 'qr-player'),
@@ -182,16 +183,32 @@
       ])
     ]);
     setScreen(screen);
-    mountQr(document.getElementById('qr-player'), playerLink(data.room_code), 240);
-    if (session.host_token) mountQr(document.getElementById('qr-host'), hostLink(data.room_code, session.host_token), 240);
+    mountQr(document.getElementById('qr-player'), playerLink(data.room_code), 360);
+    if (session.host_token) mountQr(document.getElementById('qr-host'), hostLink(data.room_code, session.host_token), 360, QRCode.CorrectLevel.L);
     syncPlayers(grid, data.players || []);
   }
 
-  function qrCard(title, caption, id) {
+  function qrCard(title, caption, id, extra) {
     return h('article', { class: 'qr-card' }, [
       h('h2', { text: title }),
       h('div', { class: 'qr-box', id: id }),
-      h('p', { text: caption })
+      h('p', { text: caption }),
+      extra || null
+    ]);
+  }
+
+  function playerFallback(room) {
+    var page = joinPageLink();
+    return h('div', { class: 'join-fallback' }, [
+      h('p', { class: 'fallback-title', text: 'Если QR не сработал' }),
+      h('a', { class: 'join-link', href: playerLink(room), text: linkLabel(page) }),
+      h('p', { class: 'muted', text: 'Откройте ссылку и введите код ' + formatRoom(room) + '.' }),
+      h('button', {
+        class: 'btn ghost',
+        type: 'button',
+        text: 'Скопировать ссылку',
+        onClick: function () { copyText(page); }
+      })
     ]);
   }
 

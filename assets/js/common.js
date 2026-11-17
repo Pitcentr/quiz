@@ -284,23 +284,63 @@ function topbar(right) {
   return h('header', { class: 'topbar' }, [brandNode(), right || h('span')]);
 }
 
-function mountQr(element, text, size) {
+function mountQr(element, text, size, level) {
   clearNode(element);
   if (typeof QRCode === 'undefined') {
     element.textContent = 'QR-код недоступен';
     return;
   }
   try {
-    new QRCode(element, {
+    var qr = new QRCode(element, {
       text: text,
-      width: size || 240,
-      height: size || 240,
+      width: size || 320,
+      height: size || 320,
       colorDark: '#101218',
       colorLight: '#ffffff',
-      correctLevel: QRCode.CorrectLevel.M
+      correctLevel: level || QRCode.CorrectLevel.M
     });
+    // Библиотека обводит клетки линией, и между ними появляются белые щели.
+    // Камера их не читает, поэтому рисуем клетки целыми пикселями без обводки.
+    paintCrispQr(element, qr._oQRCode, size || 320);
   } catch (error) {
     element.textContent = 'Не удалось построить QR-код';
+  }
+}
+
+function paintCrispQr(element, model, maxPx) {
+  if (!model || typeof model.getModuleCount !== 'function' || typeof model.isDark !== 'function') return;
+  var count = model.getModuleCount();
+  var quiet = 4;
+  var cells = count + quiet * 2;
+  var cell = Math.max(4, Math.floor(maxPx / cells));
+  var side = cell * cells;
+  var canvas = document.createElement('canvas');
+  canvas.width = side;
+  canvas.height = side;
+  var ctx = canvas.getContext('2d');
+  if (!ctx) return;
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, side, side);
+  ctx.fillStyle = '#101218';
+  for (var row = 0; row < count; row += 1) {
+    for (var col = 0; col < count; col += 1) {
+      if (model.isDark(row, col)) ctx.fillRect((col + quiet) * cell, (row + quiet) * cell, cell, cell);
+    }
+  }
+  clearNode(element);
+  element.appendChild(canvas);
+}
+
+function joinPageLink() {
+  return new URL('player.html', window.location.href).href;
+}
+
+function linkLabel(url) {
+  try {
+    var parsed = new URL(url);
+    return (parsed.host + parsed.pathname).replace(/\/$/, '');
+  } catch (error) {
+    return url;
   }
 }
 

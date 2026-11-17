@@ -167,7 +167,31 @@ h2 { font-size: 28px; margin-bottom: 8px; }
   display: grid;
   place-items: center;
 }
-.qr-box canvas, .qr-box img, .qr-box table { width: min(240px, 100%) !important; height: auto !important; }
+.qr-box canvas {
+  display: block;
+  width: min(360px, 100%);
+  height: auto;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+.qr-box img, .qr-box table { display: none; }
+.join-fallback {
+  margin: 4px 0 14px;
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, .04);
+}
+.fallback-title { margin: 0; font-weight: 800; color: var(--text); }
+.join-link {
+  color: var(--text);
+  font-weight: 800;
+  font-size: clamp(16px, 1.6vw, 22px);
+  overflow-wrap: anywhere;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
 
 .players-panel { min-height: 280px; }
 .panel-head, .split { display: flex; justify-content: space-between; gap: 12px; align-items: center; }
