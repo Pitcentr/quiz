@@ -268,9 +268,23 @@ h2 { font-size: 28px; margin-bottom: 8px; }
 }
 .reveal h1 { font-size: clamp(42px, 6vw, 96px); margin: 0; }
 .reveal.answer h1 { font-size: clamp(64px, 8vw, 132px); max-width: 14ch; line-height: 1.02; }
-.board-wrap { min-height: calc(100vh - 140px); width: min(860px, 100%); margin: 0 auto; }
-.board-wrap .lb-row, .board-wrap .lb-head { font-size: 30px; }
-.board-wrap .lb-row { padding: 18px 20px; }
+.board-wrap {
+  min-height: calc(100vh - 140px);
+  width: min(980px, 100%);
+  margin: 0 auto;
+  padding: 0 28px 12px;
+  box-sizing: border-box;
+}
+.board-wrap .lb {
+  padding: 8px 16px 20px;
+  box-sizing: border-box;
+}
+.board-wrap .lb-head, .board-wrap .lb-row {
+  font-size: 30px;
+  grid-template-columns: 96px minmax(0, 1fr) 150px 150px;
+  gap: 16px;
+}
+.board-wrap .lb-row { padding: 18px 22px; }
 .board-wrap .avatar { width: 56px; height: 56px; }
 .board-wrap .lb-name .who { font-size: 40px; white-space: normal; overflow: visible; text-overflow: unset; }
 .q-text { font-size: clamp(28px, 4vw, 64px); line-height: 1.12; overflow-wrap: anywhere; }
@@ -543,7 +557,9 @@ input {
     grid-template-columns: minmax(0, 1fr) minmax(720px, 1.4fr);
     align-items: start;
   }
-  .stage .opt, .stage-live .opt { min-height: 120px; font-size: 28px; }
+  .stage .opt, .stage-live .opt { min-height: 92px; font-size: 28px; }
+  .stage-live .options.stack .opt { min-height: 84px; padding: 16px 22px; }
+  .board-wrap .lb { max-height: calc(100vh - 220px); overflow: auto; padding: 12px 24px 28px; }
   .stage-rail, .answered-panel { position: sticky; top: 16px; max-height: calc(100vh - 40px); overflow: auto; }
   .players-panel { position: sticky; top: 16px; max-height: calc(100vh - 40px); overflow: auto; }
   .lb { max-height: calc(100vh - 180px); overflow: auto; }

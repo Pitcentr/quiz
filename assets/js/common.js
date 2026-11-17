@@ -576,6 +576,24 @@ function playReveal() {
   setTimeout(function () { playTone(523, 0.24, 'sine', 0.05); }, 110);
 }
 
+function playAnswerLock() {
+  playTone(494, 0.07, 'sine', 0.045);
+  setTimeout(function () { playTone(740, 0.11, 'triangle', 0.05); }, 55);
+}
+
+function playAnswerShow() {
+  playTone(196, 0.32, 'sine', 0.04);
+  [523, 659, 784, 1047].forEach(function (freq, index) {
+    setTimeout(function () { playTone(freq, 0.32, 'triangle', 0.06); }, 90 + index * 130);
+  });
+}
+
+function playRankOpen() {
+  playTone(165, 0.28, 'sine', 0.05);
+  setTimeout(function () { playTone(220, 0.24, 'sine', 0.045); }, 120);
+  setTimeout(function () { playTone(330, 0.36, 'triangle', 0.05); }, 240);
+}
+
 function playAward() {
   [523, 659, 784, 1046].forEach(function (freq, index) {
     setTimeout(function () { playTone(freq, 0.18, 'triangle', 0.05); }, index * 90);

@@ -5,6 +5,8 @@
   var stopPoll = null;
   var revealClock = null;
   var creating = false;
+  var heardQuestion = '';
+  var heardAnswers = 0;
   var advanceState = { timer: null, key: '' };
 
   function stopReveal() {
@@ -293,7 +295,7 @@
   function mountQuestion(data) {
     document.title = 'КВИЗ · вопрос ' + data.current_question_number;
     var question = data.question;
-    var options = h('div', { class: 'options grid', id: 'options' });
+    var options = h('div', { class: 'options stack', id: 'options' });
     var board = h('div', { id: 'side-board' });
     setScreen(h('div', { class: 'shell' }, [
       topbar(screenBar('Вопрос ' + question.number + ' из ' + question.total)),
@@ -313,6 +315,7 @@
     ]));
     paintOptions(options, question, { interactive: false });
     renderLeaderboard(board, ratedRows(data), { scoresOnly: true, showStatus: true });
+    rememberAnswers(data, true);
     startWaitBed();
   }
 
@@ -335,6 +338,20 @@
 
   function answeredText(data) {
     return 'Ответили ' + data.answered_count + ' из ' + data.player_count;
+  }
+
+  function rememberAnswers(data, silent) {
+    var qid = data.question ? data.question.id : '';
+    var count = Number(data.answered_count) || 0;
+    if (silent || heardQuestion !== qid) {
+      heardQuestion = qid;
+      heardAnswers = count;
+      return;
+    }
+    var added = count - heardAnswers;
+    heardAnswers = count;
+    var burst = Math.min(added, 4);
+    for (var i = 0; i < burst; i += 1) setTimeout(playAnswerLock, i * 110);
   }
 
   function beatNumber(left) {
@@ -383,7 +400,7 @@
         h('h1', { text: answer || 'Ответ зафиксирован' })
       ])
     ]));
-    playReveal();
+    playAnswerShow();
     revealClock = setInterval(function () {
       if (!snapshot) return;
       if (revealRemaining(snapshot.question_closed_at) <= 0) {
@@ -404,6 +421,7 @@
       ])
     ]));
     renderLeaderboard(list, data.leaderboard || [], { ceremony: true });
+    playRankOpen();
   }
 
   function mountFinal(data) {
@@ -459,6 +477,7 @@
       var side = document.getElementById('side-board');
       if (side) renderLeaderboard(side, ratedRows(data), { scoresOnly: true, showStatus: true });
       if (data.question) updateMeter(data.question.number, data.question.total);
+      rememberAnswers(data, false);
     } else if (view === 'ceremony' || view === 'final') {
       var board = document.getElementById('board');
       if (board && board.dataset.ceremony !== 'preview') renderLeaderboard(board, data.leaderboard || []);
