@@ -141,6 +141,7 @@
   }
 
   function render(data) {
+    closeIfEveryoneAnswered(data, session, refresh);
     armAutoAdvance(advanceState, data, session, refresh);
     var view = viewOf(data);
     var qid = data.question ? data.question.id : '';

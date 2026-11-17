@@ -70,6 +70,7 @@
   }
 
   function render(data) {
+    closeIfEveryoneAnswered(data, session, refresh);
     armAutoAdvance(advanceState, data, session, refresh);
     var key = keyOf(data);
     if (app.dataset.key === key) {

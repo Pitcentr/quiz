@@ -588,47 +588,39 @@ function playCoin() {
 }
 
 var waitBed = null;
+var closingQuestionId = '';
 
 function startWaitBed() {
   if (waitBed) return;
   var ctx = audioContext();
   if (!ctx) return;
   var master = ctx.createGain();
-  var filter = ctx.createBiquadFilter();
   master.gain.setValueAtTime(0.0001, ctx.currentTime);
-  master.gain.exponentialRampToValueAtTime(0.55, ctx.currentTime + 0.5);
-  filter.type = 'lowpass';
-  filter.frequency.value = 900;
-  filter.connect(master);
+  master.gain.exponentialRampToValueAtTime(0.65, ctx.currentTime + 0.4);
   master.connect(ctx.destination);
-  var drone = ctx.createOscillator();
-  var droneGain = ctx.createGain();
-  drone.type = 'sine';
-  drone.frequency.value = 110;
-  droneGain.gain.value = 0.05;
-  drone.connect(droneGain);
-  droneGain.connect(filter);
-  drone.start();
-  var notes = [329.63, 392, 440, 392];
-  var step = 0;
-  function pulse() {
-    if (!waitBed || !audioCtx) return;
-    var time = audioCtx.currentTime;
+  function thump(offset, freq, peak) {
+    if (!audioCtx) return;
+    var time = audioCtx.currentTime + offset;
     var osc = audioCtx.createOscillator();
     var gain = audioCtx.createGain();
     osc.type = 'sine';
-    osc.frequency.value = notes[step % notes.length];
-    step += 1;
+    osc.frequency.setValueAtTime(freq, time);
+    osc.frequency.exponentialRampToValueAtTime(46, time + 0.18);
     gain.gain.setValueAtTime(0.0001, time);
-    gain.gain.exponentialRampToValueAtTime(0.09, time + 0.02);
-    gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.48);
+    gain.gain.exponentialRampToValueAtTime(peak, time + 0.012);
+    gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.24);
     osc.connect(gain);
-    gain.connect(filter);
+    gain.connect(master);
     osc.start(time);
-    osc.stop(time + 0.5);
+    osc.stop(time + 0.26);
   }
-  pulse();
-  waitBed = { master: master, drone: drone, timer: setInterval(pulse, 680) };
+  function beat() {
+    if (!waitBed) return;
+    thump(0, 146, 0.2);
+    thump(0.16, 98, 0.11);
+  }
+  beat();
+  waitBed = { master: master, timer: setInterval(beat, 1280) };
 }
 
 function stopWaitBed() {
@@ -636,16 +628,43 @@ function stopWaitBed() {
   clearInterval(waitBed.timer);
   var bed = waitBed;
   waitBed = null;
-  if (audioCtx) {
+  if (audioCtx && bed.master) {
     var now = audioCtx.currentTime;
     bed.master.gain.cancelScheduledValues(now);
     bed.master.gain.setValueAtTime(Math.max(bed.master.gain.value, 0.0001), now);
-    bed.master.gain.exponentialRampToValueAtTime(0.0001, now + 0.3);
+    bed.master.gain.exponentialRampToValueAtTime(0.0001, now + 0.25);
   }
   setTimeout(function () {
-    try { bed.drone.stop(); } catch (error) {}
     try { bed.master.disconnect(); } catch (error) {}
-  }, 340);
+  }, 300);
+}
+
+function closeIfEveryoneAnswered(data, credentials, onDone) {
+  if (!credentials || !credentials.host_token || !data) return;
+  if (data.status !== 'active' || data.question_phase !== 'open') {
+    closingQuestionId = '';
+    return;
+  }
+  if (!data.player_count || Number(data.answered_count) < Number(data.player_count)) return;
+  var qid = data.question && data.question.id ? data.question.id : '';
+  if (!qid || closingQuestionId === qid) return;
+  closingQuestionId = qid;
+  apiRequest('finishQuestion', {
+    host_token: credentials.host_token,
+    room_code: credentials.room_code
+  }).then(function () {
+    if (onDone) onDone();
+  }).catch(function (error) {
+    var code = error && error.code;
+    if (code === 'QUESTION_NOT_OPEN' || code === 'GAME_NOT_ACTIVE') {
+      if (onDone) onDone();
+      return;
+    }
+    closingQuestionId = '';
+    if (code !== 'CONFLICT' && code !== 'NETWORK' && code !== 'TIMEOUT') {
+      toast(error && error.message ? error.message : 'Не удалось закрыть вопрос');
+    }
+  });
 }
 
 document.addEventListener('pointerdown', function () { audioContext(); });
