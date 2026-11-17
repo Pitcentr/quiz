@@ -595,32 +595,43 @@ function startWaitBed() {
   var ctx = audioContext();
   if (!ctx) return;
   var master = ctx.createGain();
+  var filter = ctx.createBiquadFilter();
   master.gain.setValueAtTime(0.0001, ctx.currentTime);
-  master.gain.exponentialRampToValueAtTime(0.65, ctx.currentTime + 0.4);
+  master.gain.exponentialRampToValueAtTime(0.55, ctx.currentTime + 0.8);
+  filter.type = 'lowpass';
+  filter.frequency.value = 1600;
+  filter.connect(master);
   master.connect(ctx.destination);
-  function thump(offset, freq, peak) {
-    if (!audioCtx) return;
-    var time = audioCtx.currentTime + offset;
-    var osc = audioCtx.createOscillator();
-    var gain = audioCtx.createGain();
-    osc.type = 'sine';
+  var melody = [349.23, 311.13, 349.23, 392, 349.23, 311.13, 261.63, 293.66];
+  var bass = [87.31, 87.31, 98, 110, 87.31, 82.41, 73.42, 82.41];
+  var step = 0;
+  var next = ctx.currentTime + 0.05;
+  function voice(freq, time, dur, peak, type) {
+    var osc = ctx.createOscillator();
+    var gain = ctx.createGain();
+    osc.type = type;
     osc.frequency.setValueAtTime(freq, time);
-    osc.frequency.exponentialRampToValueAtTime(46, time + 0.18);
     gain.gain.setValueAtTime(0.0001, time);
-    gain.gain.exponentialRampToValueAtTime(peak, time + 0.012);
-    gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.24);
+    gain.gain.exponentialRampToValueAtTime(peak, time + 0.04);
+    gain.gain.exponentialRampToValueAtTime(0.0001, time + dur);
     osc.connect(gain);
-    gain.connect(master);
+    gain.connect(filter);
     osc.start(time);
-    osc.stop(time + 0.26);
+    osc.stop(time + dur + 0.02);
   }
-  function beat() {
-    if (!waitBed) return;
-    thump(0, 146, 0.2);
-    thump(0.16, 98, 0.11);
+  function loop() {
+    if (!waitBed || !audioCtx) return;
+    var beat = 0.46;
+    while (next < audioCtx.currentTime + 1.1) {
+      var index = step % melody.length;
+      voice(bass[index], next, beat * 0.92, 0.06, 'sine');
+      voice(melody[index], next, beat * 0.8, 0.045, 'triangle');
+      step += 1;
+      next += beat;
+    }
   }
-  beat();
-  waitBed = { master: master, timer: setInterval(beat, 1280) };
+  waitBed = { master: master, timer: setInterval(loop, 250) };
+  loop();
 }
 
 function stopWaitBed() {
