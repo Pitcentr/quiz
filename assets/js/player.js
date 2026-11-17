@@ -51,7 +51,7 @@
       room ? null : h('label', { text: 'Код комнаты' }),
       room ? null : h('input', { id: 'room', inputmode: 'numeric', maxlength: '6', autocomplete: 'off', placeholder: '000000', required: 'required' }),
       h('label', { text: 'Имя' }),
-      h('input', { id: 'name', maxlength: '20', autocomplete: 'nickname', placeholder: 'Например, Аня', required: 'required' }),
+      h('input', { id: 'name', maxlength: '20', autocomplete: 'nickname', placeholder: 'Например, Коля', required: 'required' }),
       h('button', { class: 'btn primary block', id: 'join-btn', type: 'submit', text: 'Присоединиться' }),
       h('p', { class: 'muted', text: 'После входа это устройство запомнит вас до конца игры.' })
     ]);
