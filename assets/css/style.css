@@ -558,13 +558,14 @@ input {
   .lobby { grid-template-columns: minmax(320px, 620px) minmax(0, 1fr); align-items: start; }
   .stage { grid-template-columns: minmax(0, 1fr) 320px; align-items: start; }
   .stage-live {
-    grid-template-columns: minmax(0, 1.7fr) minmax(460px, 0.72fr);
+    grid-template-columns: minmax(480px, 0.82fr) minmax(680px, 1.2fr);
     align-items: start;
   }
   .stage .opt, .stage-live .opt { min-height: 92px; font-size: 28px; }
   .stage-live .options.stack .opt { min-height: 84px; padding: 16px 22px; }
   .board-wrap .lb { max-height: calc(100vh - 220px); overflow: auto; padding: 12px 24px 28px; }
-  .stage-rail, .answered-panel { position: sticky; top: 16px; max-height: calc(100vh - 40px); overflow: auto; }
+  .stage-rail, .answered-panel { position: sticky; top: 16px; max-height: none; overflow: visible; }
+  .stage-live .stage-rail .lb { max-height: none; overflow: visible; }
   .players-panel { position: sticky; top: 16px; max-height: calc(100vh - 40px); overflow: auto; }
   .lb { max-height: calc(100vh - 180px); overflow: auto; }
 }
