@@ -5,6 +5,7 @@
   var stopPoll = null;
   var revealClock = null;
   var creating = false;
+  var advanceState = { timer: null, key: '' };
 
   function stopReveal() {
     if (revealClock) {
@@ -15,6 +16,7 @@
 
   function setScreen(node) {
     stopReveal();
+    stopWaitBed();
     clearConfetti();
     clearNode(app);
     app.appendChild(node);
@@ -101,6 +103,7 @@
       render(data);
     }).catch(function (error) {
       if (error.code === 'GAME_ARCHIVED' || error.code === 'ROOM_NOT_FOUND') {
+        clearAutoAdvance(advanceState);
         if (stopPoll) stopPoll();
         stopPoll = null;
         clearScreenSession();
@@ -128,12 +131,17 @@
     if (data.status === 'finished') return 'final';
     if (data.status === 'waiting') return 'lobby';
     if (data.question_phase === 'open') return 'question';
-    if (data.question_phase === 'closed' && revealRemaining(data.question_closed_at) > 0) return 'reveal';
-    if (data.question_phase === 'closed' || data.question_phase === 'results') return 'ceremony';
+    if (data.question_phase === 'results') return 'ceremony';
+    if (data.question_phase === 'closed') {
+      if (countdownRemaining(data.question_closed_at) > 0) return 'countdown';
+      if (revealRemaining(data.question_closed_at) > 0) return 'answer';
+      return 'ceremony';
+    }
     return 'lobby';
   }
 
   function render(data) {
+    armAutoAdvance(advanceState, data, session, refresh);
     var view = viewOf(data);
     var qid = data.question ? data.question.id : '';
     var key = view + ':' + qid;
@@ -144,7 +152,8 @@
     app.dataset.key = key;
     if (view === 'lobby') mountLobby(data);
     else if (view === 'question') mountQuestion(data);
-    else if (view === 'reveal') mountReveal(data);
+    else if (view === 'countdown') mountCountdown(data);
+    else if (view === 'answer') mountAnswer(data);
     else if (view === 'ceremony') mountCeremony(data);
     else if (view === 'final') mountFinal(data);
   }
@@ -212,6 +221,7 @@
       danger: true
     }).then(function (ok) {
       if (!ok) return;
+      clearAutoAdvance(advanceState);
       if (stopPoll) stopPoll();
       stopPoll = null;
       clearScreenSession();
@@ -284,7 +294,6 @@
     var question = data.question;
     var options = h('div', { class: 'options grid', id: 'options' });
     var board = h('div', { id: 'side-board' });
-    var answered = h('div', { class: 'answered-list', id: 'answered-list' });
     setScreen(h('div', { class: 'shell' }, [
       topbar(screenBar('Вопрос ' + question.number + ' из ' + question.total)),
       h('section', { class: 'stage-live' }, [
@@ -298,52 +307,28 @@
         h('aside', { class: 'card stage-rail' }, [
           h('h2', { text: 'Рейтинг' }),
           board
-        ]),
-        h('aside', { class: 'card answered-panel' }, [
-          h('h2', { text: 'Ответили' }),
-          h('p', { class: 'muted', id: 'answered-count', text: answeredText(data) }),
-          answered
         ])
       ])
     ]));
     paintOptions(options, question, { interactive: false });
-    renderLeaderboard(board, data.leaderboard || [], { compact: true, scoresOnly: true });
-    syncAnswered(answered, data);
+    renderLeaderboard(board, ratedRows(data), { scoresOnly: true, showStatus: true });
+    startWaitBed();
   }
 
-  function standingRows(data) {
+  function ratedRows(data) {
     var answeredById = {};
     (data.players || []).forEach(function (player) {
       answeredById[player.player_id] = !!player.answered;
     });
-    var source = (data.leaderboard && data.leaderboard.length) ? data.leaderboard : (data.players || []);
-    return source.map(function (row) {
+    return (data.leaderboard || []).map(function (row) {
       return {
         player_id: row.player_id,
         name: row.name,
-        answered: answeredById[row.player_id] || false
+        place: row.place,
+        total_score: row.total_score,
+        last_points: row.last_points,
+        answered: !!answeredById[row.player_id]
       };
-    });
-  }
-
-  function syncAnswered(container, data) {
-    var rows = standingRows(data);
-    var sig = rows.map(function (row) {
-      return row.player_id + (row.answered ? '1' : '0');
-    }).join('|');
-    if (container.dataset.sig === sig) return;
-    container.dataset.sig = sig;
-    clearNode(container);
-    if (!rows.length) {
-      container.appendChild(h('p', { class: 'empty', text: 'Пока никого нет.' }));
-      return;
-    }
-    rows.forEach(function (row) {
-      container.appendChild(h('div', { class: 'answered-row' + (row.answered ? ' done' : '') }, [
-        playerAvatar(row.player_id || row.name),
-        h('span', { class: 'nm', text: row.name }),
-        h('span', { class: 'dot' + (row.answered ? ' on' : ''), title: row.answered ? 'Ответил' : 'Ещё думает' })
-      ]));
     });
   }
 
@@ -351,35 +336,29 @@
     return 'Ответили ' + data.answered_count + ' из ' + data.player_count;
   }
 
-  function revealNumber(data) {
-    return Math.max(1, Math.min(5, Math.ceil(revealRemaining(data.question_closed_at) / 1000)));
+  function beatNumber(left) {
+    return Math.max(1, Math.min(5, Math.ceil(left / 1000)));
   }
 
-  function mountReveal(data) {
-    document.title = 'КВИЗ · правильный ответ';
-    var question = data.question || {};
-    var letter = question.correct_answer || '';
-    var answer = letter && question.answers ? question.answers[letter] : '';
+  function mountCountdown(data) {
+    document.title = 'КВИЗ · отсчёт';
     setScreen(h('div', { class: 'shell' }, [
       h('section', { class: 'reveal' }, [
-        h('p', { class: 'eyebrow', text: 'Правильный ответ' }),
-        h('div', { class: 'reveal-count pop', id: 'reveal-count', text: String(revealNumber(data)) }),
-        h('p', { class: 'reveal-letter', text: letter }),
-        h('h1', { text: answer || 'Ответ зафиксирован' })
+        h('p', { class: 'eyebrow', text: 'Правильный ответ через' }),
+        h('div', { class: 'reveal-count pop', id: 'reveal-count', text: String(beatNumber(countdownRemaining(data.question_closed_at))) })
       ])
     ]));
-    playReveal();
     playTick();
-    var last = revealNumber(data);
+    var last = beatNumber(countdownRemaining(data.question_closed_at));
     revealClock = setInterval(function () {
       if (!snapshot) return;
-      var left = revealRemaining(snapshot.question_closed_at);
+      var left = countdownRemaining(snapshot.question_closed_at);
       if (left <= 0) {
         stopReveal();
         render(snapshot);
         return;
       }
-      var num = Math.max(1, Math.min(5, Math.ceil(left / 1000)));
+      var num = beatNumber(left);
       var node = document.getElementById('reveal-count');
       if (!node || num === last) return;
       last = num;
@@ -388,6 +367,28 @@
       void node.offsetWidth;
       node.classList.add('pop');
       playTick();
+    }, 80);
+  }
+
+  function mountAnswer(data) {
+    document.title = 'КВИЗ · правильный ответ';
+    var question = data.question || {};
+    var letter = question.correct_answer || '';
+    var answer = letter && question.answers ? question.answers[letter] : '';
+    setScreen(h('div', { class: 'shell' }, [
+      h('section', { class: 'reveal answer' }, [
+        h('p', { class: 'eyebrow', text: 'Правильный ответ' }),
+        letter ? h('p', { class: 'reveal-letter', text: letter }) : null,
+        h('h1', { text: answer || 'Ответ зафиксирован' })
+      ])
+    ]));
+    playReveal();
+    revealClock = setInterval(function () {
+      if (!snapshot) return;
+      if (revealRemaining(snapshot.question_closed_at) <= 0) {
+        stopReveal();
+        render(snapshot);
+      }
     }, 80);
   }
 
@@ -454,12 +455,8 @@
     } else if (view === 'question') {
       var label = document.getElementById('answered-label');
       if (label) label.textContent = answeredText(data);
-      var count = document.getElementById('answered-count');
-      if (count) count.textContent = answeredText(data);
-      var answered = document.getElementById('answered-list');
-      if (answered) syncAnswered(answered, data);
       var side = document.getElementById('side-board');
-      if (side) renderLeaderboard(side, data.leaderboard || [], { compact: true, scoresOnly: true });
+      if (side) renderLeaderboard(side, ratedRows(data), { scoresOnly: true, showStatus: true });
       if (data.question) updateMeter(data.question.number, data.question.total);
     } else if (view === 'ceremony' || view === 'final') {
       var board = document.getElementById('board');

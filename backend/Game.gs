@@ -174,8 +174,8 @@ function nextQuestion_(params) {
     }
     if (game.question_phase === 'closed') {
       var closedAt = Date.parse(game.question_closed_at);
-      if (isNaN(closedAt) || Date.now() < closedAt + CONFIG.REVEAL_MS) {
-        throwApp_('REVEAL_IN_PROGRESS', 'На экране ещё идёт отсчёт');
+      if (isNaN(closedAt) || Date.now() < closedAt + CONFIG.REVEAL_MS + CONFIG.ANSWER_MS) {
+        throwApp_('REVEAL_IN_PROGRESS', 'На экране ещё отсчёт и ответ');
       }
     }
     var index = -1;
@@ -203,8 +203,8 @@ function finishGame_(params) {
     }
     if (game.question_phase === 'closed') {
       var closedAt = Date.parse(game.question_closed_at);
-      if (isNaN(closedAt) || Date.now() < closedAt + CONFIG.REVEAL_MS) {
-        throwApp_('REVEAL_IN_PROGRESS', 'На экране ещё идёт отсчёт');
+      if (isNaN(closedAt) || Date.now() < closedAt + CONFIG.REVEAL_MS + CONFIG.ANSWER_MS) {
+        throwApp_('REVEAL_IN_PROGRESS', 'На экране ещё отсчёт и ответ');
       }
     }
     game.status = 'finished';

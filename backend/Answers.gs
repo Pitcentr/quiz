@@ -36,10 +36,14 @@ function submitAnswer_(params) {
     };
     dbSaveAnswer_(answer);
     game.updated_at = answer.answered_at;
-    dbSaveGame_(game);
+    // Последний ответ закрывает вопрос сам: ведущему не нужно нажимать «Завершить».
+    var closed = everyoneAnswered_(game);
+    if (closed) closeOpenQuestion_(game);
+    else dbSaveGame_(game);
     return {
       accepted: true,
       already: false,
+      closed: closed,
       question_id: answer.question_id,
       answer: choice,
       server_time: answer.answered_at
@@ -47,31 +51,40 @@ function submitAnswer_(params) {
   });
 }
 
+function everyoneAnswered_(game) {
+  var players = dbPlayers_(game.game_id);
+  return players.length > 0 && currentAnswers_(game).length >= players.length;
+}
+
+function closeOpenQuestion_(game) {
+  var question = currentQuestion_(game);
+  var byPlayer = {};
+  currentAnswers_(game).forEach(function (answer) { byPlayer[answer.player_id] = answer; });
+  // Переход open -> closed начисляет баллы один раз. Повторный вызов сюда не доходит,
+  // а уже заполненное поле points страхует от двойного суммирования при сбое посередине.
+  dbPlayers_(game.game_id).forEach(function (player) {
+    var answer = byPlayer[player.player_id];
+    if (!answer || isScored_(answer)) return;
+    var correct = answer.answer === question.correct_answer;
+    answer.is_correct = correct;
+    answer.points = correct ? question.points : 0;
+    player.total_score = Number(player.total_score || 0) + answer.points;
+    dbSaveAnswer_(answer);
+    dbSavePlayer_(player);
+  });
+  var closedAt = nowIso_();
+  game.question_phase = 'closed';
+  game.question_closed_at = closedAt;
+  game.updated_at = closedAt;
+  dbSaveGame_(game);
+}
+
 function finishQuestion_(params) {
   return withLock_(function () {
     var game = requireHost_(params);
     if (game.status !== 'active') throwApp_('GAME_NOT_ACTIVE', 'Игра не активна');
     if (game.question_phase !== 'open') throwApp_('QUESTION_NOT_OPEN', 'Вопрос уже завершён или ещё не открыт');
-    var question = currentQuestion_(game);
-    var byPlayer = {};
-    currentAnswers_(game).forEach(function (answer) { byPlayer[answer.player_id] = answer; });
-    // Переход open -> closed начисляет баллы один раз. Повторный вызов сюда не доходит,
-    // а уже заполненное поле points страхует от двойного суммирования при сбое посередине.
-    dbPlayers_(game.game_id).forEach(function (player) {
-      var answer = byPlayer[player.player_id];
-      if (!answer || isScored_(answer)) return;
-      var correct = answer.answer === question.correct_answer;
-      answer.is_correct = correct;
-      answer.points = correct ? question.points : 0;
-      player.total_score = Number(player.total_score || 0) + answer.points;
-      dbSaveAnswer_(answer);
-      dbSavePlayer_(player);
-    });
-    var closed = nowIso_();
-    game.question_phase = 'closed';
-    game.question_closed_at = closed;
-    game.updated_at = closed;
-    dbSaveGame_(game);
+    closeOpenQuestion_(game);
     return snapshot_(game, 'host');
   });
 }

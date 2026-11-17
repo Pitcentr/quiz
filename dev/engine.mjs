@@ -13,6 +13,7 @@ import { fileURLToPath } from 'node:url';
 const VERSION = '1.0.0';
 const MAX_PLAYERS = 20;
 const REVEAL_MS = 5000;
+const ANSWER_MS = 5000;
 const MIN_NAME = 2;
 const MAX_NAME = 20;
 
@@ -495,7 +496,7 @@ export function createQuizEngine(options = {}) {
       }
       // Повтор той же отправки после обрыва сети не создаёт второй ответ.
       // Чужой player_id и присланные баллы игнорируются: игрок определяется только токеном.
-      // Вопрос не закрывается по таймеру: приём идёт, пока ведущий сам его не завершит.
+      // Вопрос не закрывается по таймеру. Его закрывает ведущий или последний ответ.
       const answer = {
         id: 'a_' + randomUUID(),
         game_id: game.game_id,
@@ -509,9 +510,13 @@ export function createQuizEngine(options = {}) {
       state.answers.set(answer.id, answer);
       state.answersByGame.get(game.game_id).push(answer.id);
       game.updated_at = answer.answered_at;
+      // Последний ответ закрывает вопрос сам: ведущему не нужно нажимать «Завершить».
+      const closed = everyoneAnswered(game);
+      if (closed) closeOpenQuestion(game);
       return {
         accepted: true,
         already: false,
+        closed,
         question_id: answer.question_id,
         answer: choice,
         server_time: answer.answered_at
@@ -519,29 +524,37 @@ export function createQuizEngine(options = {}) {
     });
   }
 
+  function everyoneAnswered(game) {
+    const players = playersFor(game.game_id);
+    return players.length > 0 && currentAnswers(game).length >= players.length;
+  }
+
+  function closeOpenQuestion(game) {
+    const question = currentQuestion(game);
+    const byPlayer = new Map(currentAnswers(game).map((answer) => [answer.player_id, answer]));
+    // Начисление выполняется один раз при переходе open -> closed.
+    // Уже заполненные points пропускаются, чтобы повторный вызов не удвоил счёт.
+    playersFor(game.game_id).forEach((player) => {
+      const answer = byPlayer.get(player.player_id);
+      if (!answer || isScored(answer)) return;
+      const correct = answer.answer === question.correct_answer;
+      const points = correct ? question.points : 0;
+      answer.is_correct = correct;
+      answer.points = points;
+      player.total_score = Number(player.total_score || 0) + points;
+    });
+    const closed = iso(nowMs());
+    game.question_phase = 'closed';
+    game.question_closed_at = closed;
+    game.updated_at = closed;
+  }
+
   function finishQuestion(params) {
     return withLock(() => {
       const game = requireHost(params);
       if (game.status !== 'active') throwApp('GAME_NOT_ACTIVE', 'Игра не активна');
       if (game.question_phase !== 'open') throwApp('QUESTION_NOT_OPEN', 'Вопрос уже завершён или ещё не открыт');
-      const question = currentQuestion(game);
-      const answers = currentAnswers(game);
-      const byPlayer = new Map(answers.map((answer) => [answer.player_id, answer]));
-      // Начисление выполняется один раз при переходе open -> closed.
-      // Уже заполненные points пропускаются, чтобы повторный вызов не удвоил счёт.
-      playersFor(game.game_id).forEach((player) => {
-        const answer = byPlayer.get(player.player_id);
-        if (!answer || isScored(answer)) return;
-        const correct = answer.answer === question.correct_answer;
-        const points = correct ? question.points : 0;
-        answer.is_correct = correct;
-        answer.points = points;
-        player.total_score = Number(player.total_score || 0) + points;
-      });
-      const closed = iso(nowMs());
-      game.question_phase = 'closed';
-      game.question_closed_at = closed;
-      game.updated_at = closed;
+      closeOpenQuestion(game);
       return snapshot(game, 'host');
     });
   }
@@ -566,8 +579,8 @@ export function createQuizEngine(options = {}) {
       }
       if (game.question_phase === 'closed') {
         const closedAt = Date.parse(game.question_closed_at);
-        if (Number.isNaN(closedAt) || nowMs() < closedAt + REVEAL_MS) {
-          throwApp('REVEAL_IN_PROGRESS', 'На экране ещё идёт отсчёт');
+        if (Number.isNaN(closedAt) || nowMs() < closedAt + REVEAL_MS + ANSWER_MS) {
+          throwApp('REVEAL_IN_PROGRESS', 'На экране ещё отсчёт и ответ');
         }
       }
       const index = game.questions.findIndex((item) => item.id === game.current_question);
@@ -594,8 +607,8 @@ export function createQuizEngine(options = {}) {
       }
       if (game.question_phase === 'closed') {
         const closedAt = Date.parse(game.question_closed_at);
-        if (Number.isNaN(closedAt) || nowMs() < closedAt + REVEAL_MS) {
-          throwApp('REVEAL_IN_PROGRESS', 'На экране ещё идёт отсчёт');
+        if (Number.isNaN(closedAt) || nowMs() < closedAt + REVEAL_MS + ANSWER_MS) {
+          throwApp('REVEAL_IN_PROGRESS', 'На экране ещё отсчёт и ответ');
         }
       }
       game.status = 'finished';
@@ -641,6 +654,7 @@ export function createQuizEngine(options = {}) {
         total_questions: meta.total,
         is_last_question: meta.isLast,
         question_opened_at: game.question_opened_at || '',
+        question_closed_at: game.question_closed_at || '',
         question_time_limit: question ? question.time_limit : 0
       },
       question: questionDto(question, meta, questionOver),

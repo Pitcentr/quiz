@@ -5,6 +5,7 @@
   var stopPoll = null;
   var revealWatch = null;
   var busy = false;
+  var advanceState = { timer: null, key: '' };
 
   function stopRevealWatch() {
     if (revealWatch) {
@@ -69,6 +70,7 @@
   }
 
   function render(data) {
+    armAutoAdvance(advanceState, data, session, refresh);
     var key = keyOf(data);
     if (app.dataset.key === key) {
       update(data);
@@ -155,10 +157,9 @@
     if (data.question_phase === 'open') return button('Завершить вопрос', true, confirmFinishQuestion);
     if (data.question_phase === 'closed' || data.question_phase === 'results') {
       var last = !!data.is_last_question;
-      var left = data.question_phase === 'closed' ? revealRemaining(data.question_closed_at) : 0;
-      var label = last ? 'Завершить игру' : 'Далее';
-      var node = button(left > 0 ? 'Ответ на экране · ' + Math.ceil(left / 1000) : label, last, last ? confirmFinishGame : confirmNext, 'host-action');
-      if (left > 0) node.disabled = true;
+      var label = holdLabel(data);
+      var node = button(label, last, last ? confirmFinishGame : confirmNext, 'host-action');
+      if (data.question_phase === 'closed' && revealRemaining(data.question_closed_at) > 0) node.disabled = true;
       return node;
     }
     return h('span');
@@ -186,7 +187,7 @@
   function confirmFinishQuestion() {
     confirmDialog({
       title: 'Завершить вопрос?',
-      text: 'Приём ответов остановится. Кто не ответил, получит 0. На экране появится правильный ответ, затем рейтинг.',
+      text: 'Приём ответов остановится. Кто не ответил, получит 0. Дальше экран сам покажет отсчёт, ответ и рейтинг.',
       confirmText: 'Завершить',
       danger: true
     }).then(function (ok) { if (ok) run('finishQuestion'); });
@@ -262,6 +263,14 @@
     });
   }
 
+  function holdLabel(data) {
+    var countLeft = countdownRemaining(data.question_closed_at);
+    if (countLeft > 0) return 'Отсчёт на экране · ' + Math.ceil(countLeft / 1000);
+    var left = revealRemaining(data.question_closed_at);
+    if (left > 0) return 'Ответ на экране · ' + Math.ceil(left / 1000);
+    return data.is_last_question ? 'Завершить игру' : 'Далее';
+  }
+
   function watchReveal(data) {
     stopRevealWatch();
     if (!data || data.question_phase !== 'closed') return;
@@ -269,14 +278,8 @@
       var button = document.getElementById('host-action');
       if (!button || !snapshot) return;
       var left = revealRemaining(snapshot.question_closed_at);
-      var label = snapshot.is_last_question ? 'Завершить игру' : 'Далее';
-      if (left > 0) {
-        button.disabled = true;
-        button.textContent = 'Ответ на экране · ' + Math.ceil(left / 1000);
-      } else if (button.disabled) {
-        button.disabled = false;
-        button.textContent = label;
-      }
+      button.textContent = holdLabel(snapshot);
+      button.disabled = left > 0;
     }, 200);
   }
 

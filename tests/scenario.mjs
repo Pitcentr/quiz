@@ -235,8 +235,13 @@ async function main() {
     if (number === 1) {
       const tooSoon = await engine.handle('nextQuestion', { host_token: hostToken, room_code: room });
       check(tooSoon.error && tooSoon.error.code === 'REVEAL_IN_PROGRESS', 'next question waits for the reveal');
+      now += 5000;
+      const answerStillUp = await engine.handle('nextQuestion', { host_token: hostToken, room_code: room });
+      check(answerStillUp.error && answerStillUp.error.code === 'REVEAL_IN_PROGRESS', 'answer stays on screen for five more seconds');
+      now += 5000;
+    } else {
+      now += 10000;
     }
-    now += 5000;
     if (number === 1) {
       const shown = await engine.handle('showResults', { host_token: hostToken, room_code: room });
       check(shown.success && shown.data.question_phase === 'results', 'results phase still opens');
@@ -328,6 +333,33 @@ async function main() {
   check(slowRow.total_score === 0 && slowRow.last_points === 0, 'unanswered player scores zero');
   const duringReveal = await timed.handle('nextQuestion', { host_token: timedGame.data.host_token });
   check(duringReveal.error.code === 'NO_MORE_QUESTIONS' || duringReveal.error.code === 'REVEAL_IN_PROGRESS', 'reveal or last question blocks an early jump');
+
+  const auto = createQuizEngine({ now: () => now });
+  const autoGame = await auto.handle('createGame', {});
+  const firstPlayer = await auto.handle('joinGame', { room_code: autoGame.data.room_code, name: 'Раз' });
+  const secondPlayer = await auto.handle('joinGame', { room_code: autoGame.data.room_code, name: 'Два' });
+  const autoStart = await auto.handle('startGame', { host_token: autoGame.data.host_token, room_code: autoGame.data.room_code });
+  const autoQuestion = autoStart.data.question;
+  const oneAnswer = await auto.handle('submitAnswer', {
+    player_token: firstPlayer.data.player_token,
+    question_id: autoQuestion.id,
+    answer: autoQuestion.correct_answer
+  });
+  check(oneAnswer.success && oneAnswer.data.closed === false, 'a single answer leaves the question open');
+  const stillOpenRound = await auto.handle('getGame', { room_code: autoGame.data.room_code });
+  check(stillOpenRound.data.question_phase === 'open', 'question stays open until everyone answers');
+  const lastAnswer = await auto.handle('submitAnswer', {
+    player_token: secondPlayer.data.player_token,
+    question_id: autoQuestion.id,
+    answer: autoQuestion.correct_answer
+  });
+  check(lastAnswer.success && lastAnswer.data.closed === true, 'the last answer closes the question');
+  const autoClosed = await auto.handle('getGame', { host_token: autoGame.data.host_token, room_code: autoGame.data.room_code });
+  check(autoClosed.data.question_phase === 'closed', 'all answers move straight to the reveal');
+  const scored = autoClosed.data.leaderboard.find((row) => row.name === 'Раз');
+  check(scored && scored.total_score === autoQuestion.points, 'auto close scores the question once');
+  const manualClose = await auto.handle('finishQuestion', { host_token: autoGame.data.host_token, room_code: autoGame.data.room_code });
+  check(manualClose.error.code === 'QUESTION_NOT_OPEN', 'auto close cannot be scored again');
 
   const http = startServer({ port: 8799, engine: createQuizEngine() });
   await new Promise((resolveReady, rejectReady) => {

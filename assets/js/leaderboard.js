@@ -77,7 +77,7 @@ function renderLeaderboard(container, rows, options) {
   }
   var list = rows || [];
   var signature = list.map(function (row) {
-    return [row.player_id, row.place, row.total_score, row.last_points, row.name].join(':');
+    return [row.player_id, row.place, row.total_score, row.last_points, row.name, options.showStatus ? (row.answered ? 1 : 0) : ''].join(':');
   }).join('|');
   if (container.dataset.sig === signature) return;
   var previous = new Map();
@@ -88,6 +88,7 @@ function renderLeaderboard(container, rows, options) {
   container.classList.add('lb');
   if (options.compact) container.classList.add('compact');
   if (options.scoresOnly) container.classList.add('scores-only');
+  if (options.showStatus) container.classList.add('with-status');
   if (options.award) container.classList.add('awarding-board');
   clearNode(container);
   if (!list.length) {
@@ -97,7 +98,8 @@ function renderLeaderboard(container, rows, options) {
   container.appendChild(h('div', { class: 'lb-head' }, [
     h('span', { text: 'Место' }),
     h('span', { text: 'Игрок' }),
-    h('span', { text: 'Вопрос' }),
+    options.showStatus ? h('span', { text: 'Статус' }) : null,
+    h('span', { class: 'lb-last', text: 'Вопрос' }),
     h('span', { text: 'Всего' })
   ]));
   var nodes = [];
@@ -105,12 +107,16 @@ function renderLeaderboard(container, rows, options) {
     var medal = row.place === 1 ? ' gold' : row.place === 2 ? ' silver' : row.place === 3 ? ' bronze' : '';
     if (options.award && row.last_points) medal += ' awarding';
     var last = row.last_points ? '+' + row.last_points : '0';
+    var status = options.showStatus
+      ? h('span', { class: 'lb-status ' + (row.answered ? 'ok' : 'wait'), text: row.answered ? 'ответил' : 'ждём' })
+      : null;
     var item = h('div', { class: 'lb-row' + medal + (previous.size ? '' : ' lb-enter') }, [
       h('span', { class: 'lb-place', text: String(row.place) }),
       h('span', { class: 'lb-name' }, [
         playerAvatar(row.player_id || row.name),
         h('span', { class: 'who', text: row.name })
       ]),
+      status,
       h('span', { class: 'lb-last' + (row.last_points ? ' plus' : ''), text: last }),
       h('span', { class: 'lb-total', text: String(row.total_score) })
     ]);

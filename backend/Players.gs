@@ -63,6 +63,7 @@ function reconnectPlayer_(params) {
       total_questions: meta.total,
       is_last_question: meta.isLast,
       question_opened_at: game.question_opened_at || '',
+      question_closed_at: game.question_closed_at || '',
       question_time_limit: question ? question.time_limit : 0
     },
     question: questionDto_(question, meta, questionOver_(game)),

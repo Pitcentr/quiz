@@ -105,6 +105,7 @@
     if (data.game.status === 'finished') return 'final';
     if (data.game.status === 'waiting') return 'wait';
     if (data.game.question_phase === 'open') return data.submitted_answer ? 'accepted' : 'question';
+    if (data.game.question_phase === 'closed' && countdownRemaining(data.game.question_closed_at) > 0) return 'countdown';
     if (data.game.question_phase === 'closed' || data.game.question_phase === 'results') return 'result';
     return 'wait';
   }
@@ -121,6 +122,7 @@
     if (view === 'wait') mountWait(data);
     else if (view === 'question') mountQuestion(data);
     else if (view === 'accepted') mountAccepted(data);
+    else if (view === 'countdown') mountCountdown(data);
     else if (view === 'result') mountResult(data);
     else if (view === 'final') mountFinal(data);
   }
@@ -170,7 +172,7 @@
         h('p', { class: 'eyebrow', text: question.points + ' баллов' }),
         h('h1', { class: 'q-text', text: question.question }),
         options,
-        h('p', { class: 'muted', id: 'answer-hint', text: 'Один вариант. Ведущий закроет вопрос, когда все ответят.' })
+        h('p', { class: 'muted', id: 'answer-hint', text: 'Один вариант. Когда ответят все, вопрос закроется сам.' })
       ])
     ]));
     paintOptions(options, question, { interactive: true, onPick: choose });
@@ -181,7 +183,19 @@
     sending = true;
     Array.prototype.forEach.call(document.querySelectorAll('#options .opt'), function (button) {
       button.disabled = true;
+      if (button.getAttribute('data-letter') === letter) {
+        button.classList.add('picked', 'pending');
+        button.setAttribute('aria-busy', 'true');
+        button.appendChild(h('span', { class: 'pending-label', text: 'Ждём' }));
+      }
     });
+    var hint = document.getElementById('answer-hint');
+    if (hint) {
+      hint.className = 'answer-wait';
+      clearNode(hint);
+      hint.appendChild(h('span', { class: 'spinner', 'aria-hidden': 'true' }));
+      hint.appendChild(h('span', { text: 'Ответ выбран. Ждём подтверждение.' }));
+    }
     apiRequest('submitAnswer', {
       player_token: session.player_token,
       room_code: session.room_code,
@@ -196,7 +210,16 @@
       toast(error.message || 'Не удалось отправить ответ');
       Array.prototype.forEach.call(document.querySelectorAll('#options .opt'), function (button) {
         button.disabled = false;
+        button.classList.remove('picked', 'pending');
+        button.removeAttribute('aria-busy');
+        var label = button.querySelector('.pending-label');
+        if (label) label.remove();
       });
+      var failedHint = document.getElementById('answer-hint');
+      if (failedHint) {
+        failedHint.className = 'muted';
+        failedHint.textContent = 'Один вариант. Когда ответят все, вопрос закроется сам.';
+      }
     }).then(function () {
       sending = false;
     });
@@ -212,10 +235,44 @@
         h('p', { class: 'eyebrow', text: 'Ответ принят' }),
         h('h1', { class: 'q-text', text: question.question }),
         options,
-        h('p', { class: 'lead', text: 'Ждём, пока ведущий закроет вопрос.' })
+        h('p', { class: 'lead', text: 'Ответ принят. Ждём остальных игроков.' })
       ])
     ]));
     paintOptions(options, question, { interactive: false, selected: data.submitted_answer, locked: true });
+  }
+
+  function mountCountdown(data) {
+    document.title = 'КВИЗ · отсчёт';
+    var closedAt = data.game.question_closed_at;
+    setScreen(h('div', { class: 'shell phone' }, [
+      topbar(h('div', { class: 'pill', text: 'Смотрите на экран' })),
+      h('section', { class: 'play countdown-phone' }, [
+        h('p', { class: 'eyebrow', text: 'Правильный ответ через' }),
+        h('div', { class: 'reveal-count pop', id: 'phone-count', text: String(Math.max(1, Math.min(5, Math.ceil(countdownRemaining(closedAt) / 1000)))) }),
+        h('p', { class: 'lead', text: 'Ответ появится на большом экране.' })
+      ])
+    ]));
+    var last = Math.max(1, Math.min(5, Math.ceil(countdownRemaining(closedAt) / 1000)));
+    var clock = setInterval(function () {
+      if (!state || viewOf(state) !== 'countdown') {
+        clearInterval(clock);
+        return;
+      }
+      var left = countdownRemaining(state.game.question_closed_at);
+      if (left <= 0) {
+        clearInterval(clock);
+        render(state);
+        return;
+      }
+      var num = Math.max(1, Math.min(5, Math.ceil(left / 1000)));
+      var node = document.getElementById('phone-count');
+      if (!node || num === last) return;
+      last = num;
+      node.textContent = String(num);
+      node.classList.remove('pop');
+      void node.offsetWidth;
+      node.classList.add('pop');
+    }, 80);
   }
 
   function mountResult(data) {

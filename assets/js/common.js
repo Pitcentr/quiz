@@ -433,6 +433,7 @@ function paintOptions(container, question, options) {
     var button = h('button', {
       type: 'button',
       class: className,
+      'data-letter': letter,
       onClick: options.interactive ? function () { options.onPick(letter); } : null
     }, [
       h('span', { class: 'key', text: letter }),
@@ -468,16 +469,77 @@ function clearConfetti() {
 
 var serverClockOffset = 0;
 var audioCtx = null;
+var COUNTDOWN_MS = 5000;
+var ANSWER_MS = 5000;
+var BOARD_MS = 6000;
 
 function noteServerTime(isoTime) {
   var parsed = Date.parse(isoTime || '');
   if (!isNaN(parsed)) serverClockOffset = parsed - Date.now();
 }
 
-function revealRemaining(closedAt) {
+function serverNow() {
+  return Date.now() + serverClockOffset;
+}
+
+function elapsedSince(closedAt) {
   var closed = Date.parse(closedAt || '');
   if (isNaN(closed)) return 0;
-  return Math.max(0, closed + 5000 - (Date.now() + serverClockOffset));
+  return serverNow() - closed;
+}
+
+function countdownRemaining(closedAt) {
+  return Math.max(0, COUNTDOWN_MS - elapsedSince(closedAt));
+}
+
+function revealRemaining(closedAt) {
+  return Math.max(0, COUNTDOWN_MS + ANSWER_MS - elapsedSince(closedAt));
+}
+
+function clearAutoAdvance(state) {
+  if (!state) return;
+  if (state.timer) clearTimeout(state.timer);
+  state.timer = null;
+  state.key = '';
+}
+
+function armAutoAdvance(state, data, credentials, onDone) {
+  if (!state || !credentials || !credentials.host_token || !data) return;
+  if (data.status !== 'active' || (data.question_phase !== 'closed' && data.question_phase !== 'results')) {
+    clearAutoAdvance(state);
+    return;
+  }
+  var qid = data.question && data.question.id ? data.question.id : '';
+  var key = qid + ':' + data.question_phase;
+  if (state.key === key && state.timer) return;
+  clearAutoAdvance(state);
+  state.key = key;
+  var delay = data.question_phase === 'closed'
+    ? Math.max(0, COUNTDOWN_MS + ANSWER_MS + BOARD_MS - elapsedSince(data.question_closed_at))
+    : BOARD_MS;
+  state.timer = setTimeout(function () {
+    state.timer = null;
+    sendAdvance(data.is_last_question ? 'finishGame' : 'nextQuestion', credentials, 0, onDone);
+  }, delay + 300);
+}
+
+function sendAdvance(action, credentials, attempt, onDone) {
+  apiRequest(action, {
+    host_token: credentials.host_token,
+    room_code: credentials.room_code
+  }).then(function () {
+    if (onDone) onDone();
+  }).catch(function (error) {
+    var code = error && error.code;
+    if (attempt < 1 && (code === 'CONFLICT' || code === 'NETWORK' || code === 'TIMEOUT')) {
+      setTimeout(function () { sendAdvance(action, credentials, attempt + 1, onDone); }, 800);
+      return;
+    }
+    if (['REVEAL_IN_PROGRESS', 'RESULTS_NOT_READY', 'NO_MORE_QUESTIONS', 'QUESTION_STILL_OPEN', 'ALREADY_FINISHED', 'GAME_NOT_ACTIVE', 'QUESTION_NOT_OPEN'].indexOf(code) === -1) {
+      toast(error && error.message ? error.message : 'Не удалось перейти дальше');
+    }
+    if (onDone) onDone();
+  });
 }
 
 function audioContext() {
@@ -523,6 +585,67 @@ function playAward() {
 function playCoin() {
   playTone(988, 0.07, 'square', 0.025);
   setTimeout(function () { playTone(1480, 0.1, 'sine', 0.04); }, 45);
+}
+
+var waitBed = null;
+
+function startWaitBed() {
+  if (waitBed) return;
+  var ctx = audioContext();
+  if (!ctx) return;
+  var master = ctx.createGain();
+  var filter = ctx.createBiquadFilter();
+  master.gain.setValueAtTime(0.0001, ctx.currentTime);
+  master.gain.exponentialRampToValueAtTime(0.55, ctx.currentTime + 0.5);
+  filter.type = 'lowpass';
+  filter.frequency.value = 900;
+  filter.connect(master);
+  master.connect(ctx.destination);
+  var drone = ctx.createOscillator();
+  var droneGain = ctx.createGain();
+  drone.type = 'sine';
+  drone.frequency.value = 110;
+  droneGain.gain.value = 0.05;
+  drone.connect(droneGain);
+  droneGain.connect(filter);
+  drone.start();
+  var notes = [329.63, 392, 440, 392];
+  var step = 0;
+  function pulse() {
+    if (!waitBed || !audioCtx) return;
+    var time = audioCtx.currentTime;
+    var osc = audioCtx.createOscillator();
+    var gain = audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = notes[step % notes.length];
+    step += 1;
+    gain.gain.setValueAtTime(0.0001, time);
+    gain.gain.exponentialRampToValueAtTime(0.09, time + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, time + 0.48);
+    osc.connect(gain);
+    gain.connect(filter);
+    osc.start(time);
+    osc.stop(time + 0.5);
+  }
+  pulse();
+  waitBed = { master: master, drone: drone, timer: setInterval(pulse, 680) };
+}
+
+function stopWaitBed() {
+  if (!waitBed) return;
+  clearInterval(waitBed.timer);
+  var bed = waitBed;
+  waitBed = null;
+  if (audioCtx) {
+    var now = audioCtx.currentTime;
+    bed.master.gain.cancelScheduledValues(now);
+    bed.master.gain.setValueAtTime(Math.max(bed.master.gain.value, 0.0001), now);
+    bed.master.gain.exponentialRampToValueAtTime(0.0001, now + 0.3);
+  }
+  setTimeout(function () {
+    try { bed.drone.stop(); } catch (error) {}
+    try { bed.master.disconnect(); } catch (error) {}
+  }, 340);
 }
 
 document.addEventListener('pointerdown', function () { audioContext(); });
