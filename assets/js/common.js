@@ -590,64 +590,58 @@ function playCoin() {
 var waitBed = null;
 var closingQuestionId = '';
 
+var WAIT_TRACKS = ['assets/audio/wait.mp3', 'assets/audio/wait.m4a', 'assets/audio/wait.ogg', 'assets/audio/wait.wav'];
+
 function startWaitBed() {
   if (waitBed) return;
-  var ctx = audioContext();
-  if (!ctx) return;
-  var master = ctx.createGain();
-  var filter = ctx.createBiquadFilter();
-  master.gain.setValueAtTime(0.0001, ctx.currentTime);
-  master.gain.exponentialRampToValueAtTime(0.55, ctx.currentTime + 0.8);
-  filter.type = 'lowpass';
-  filter.frequency.value = 1600;
-  filter.connect(master);
-  master.connect(ctx.destination);
-  var melody = [349.23, 311.13, 349.23, 392, 349.23, 311.13, 261.63, 293.66];
-  var bass = [87.31, 87.31, 98, 110, 87.31, 82.41, 73.42, 82.41];
-  var step = 0;
-  var next = ctx.currentTime + 0.05;
-  function voice(freq, time, dur, peak, type) {
-    var osc = ctx.createOscillator();
-    var gain = ctx.createGain();
-    osc.type = type;
-    osc.frequency.setValueAtTime(freq, time);
-    gain.gain.setValueAtTime(0.0001, time);
-    gain.gain.exponentialRampToValueAtTime(peak, time + 0.04);
-    gain.gain.exponentialRampToValueAtTime(0.0001, time + dur);
-    osc.connect(gain);
-    gain.connect(filter);
-    osc.start(time);
-    osc.stop(time + dur + 0.02);
-  }
-  function loop() {
-    if (!waitBed || !audioCtx) return;
-    var beat = 0.46;
-    while (next < audioCtx.currentTime + 1.1) {
-      var index = step % melody.length;
-      voice(bass[index], next, beat * 0.92, 0.06, 'sine');
-      voice(melody[index], next, beat * 0.8, 0.045, 'triangle');
-      step += 1;
-      next += beat;
+  var audio = new Audio();
+  var bed = { audio: audio, alive: true, index: 0 };
+  waitBed = bed;
+  audio.loop = true;
+  audio.volume = 0.55;
+  audio.preload = 'auto';
+  audio.addEventListener('error', function () {
+    if (!bed.alive || waitBed !== bed) return;
+    bed.index += 1;
+    if (bed.index >= WAIT_TRACKS.length) {
+      bed.alive = false;
+      waitBed = null;
+      return;
     }
+    audio.src = new URL(WAIT_TRACKS[bed.index], window.location.href).href;
+    audio.load();
+  });
+  audio.addEventListener('playing', function () {
+    bed.started = true;
+  });
+  function play() {
+    if (!bed.alive || waitBed !== bed) return;
+    var pending = audio.play();
+    if (pending && pending.catch) pending.catch(function () {});
   }
-  waitBed = { master: master, timer: setInterval(loop, 250) };
-  loop();
+  audio.addEventListener('canplay', play);
+  bed.play = play;
+  audio.src = new URL(WAIT_TRACKS[0], window.location.href).href;
+  audio.load();
 }
 
 function stopWaitBed() {
   if (!waitBed) return;
-  clearInterval(waitBed.timer);
   var bed = waitBed;
   waitBed = null;
-  if (audioCtx && bed.master) {
-    var now = audioCtx.currentTime;
-    bed.master.gain.cancelScheduledValues(now);
-    bed.master.gain.setValueAtTime(Math.max(bed.master.gain.value, 0.0001), now);
-    bed.master.gain.exponentialRampToValueAtTime(0.0001, now + 0.25);
-  }
-  setTimeout(function () {
-    try { bed.master.disconnect(); } catch (error) {}
-  }, 300);
+  bed.alive = false;
+  if (bed.timer) clearInterval(bed.timer);
+  if (!bed.audio) return;
+  var audio = bed.audio;
+  var fade = setInterval(function () {
+    var next = Math.max(0, audio.volume - 0.1);
+    audio.volume = next;
+    if (next > 0) return;
+    clearInterval(fade);
+    audio.pause();
+    audio.removeAttribute('src');
+    try { audio.load(); } catch (error) {}
+  }, 40);
 }
 
 function closeIfEveryoneAnswered(data, credentials, onDone) {
@@ -678,7 +672,10 @@ function closeIfEveryoneAnswered(data, credentials, onDone) {
   });
 }
 
-document.addEventListener('pointerdown', function () { audioContext(); });
+document.addEventListener('pointerdown', function () {
+  audioContext();
+  if (waitBed && waitBed.play) waitBed.play();
+});
 
 function showConfetti() {
   clearConfetti();
