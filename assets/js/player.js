@@ -1,0 +1,289 @@
+(function () {
+  var app = document.getElementById('app');
+  var params = pageParams();
+  var session = loadPlayerSession(params.room);
+  var state = null;
+  var stopPoll = null;
+  var sending = false;
+
+  function setScreen(node) {
+    clearConfetti();
+    clearNode(app);
+    app.appendChild(node);
+  }
+
+  function ensurePoll() {
+    if (stopPoll || !session) return;
+    stopPoll = pollEvery(QUIZ_CONFIG.POLL_PLAYER_MS, refresh);
+  }
+
+  function refresh() {
+    if (!session) return Promise.resolve();
+    return apiRequest('reconnectPlayer', {
+      player_token: session.player_token,
+      room_code: session.room_code
+    }).then(function (data) {
+      state = data;
+      setConnection(true);
+      render(data);
+    }).catch(function (error) {
+      if (error.code === 'PLAYER_NOT_FOUND' || error.code === 'GAME_ARCHIVED' || error.code === 'UNAUTHORIZED') {
+        if (stopPoll) stopPoll();
+        stopPoll = null;
+        clearPlayerSession(session && session.room_code);
+        session = null;
+        state = null;
+        toast(error.message);
+        renderJoin();
+        return;
+      }
+      setConnection(false);
+    });
+  }
+
+  function renderJoin() {
+    app.dataset.key = 'join';
+    document.title = 'КВИЗ — вход';
+    var room = params.room || '';
+    var form = h('form', { class: 'card join', onSubmit: onJoin }, [
+      h('p', { class: 'eyebrow', text: room ? 'Комната ' + formatRoom(room) : 'Вход в игру' }),
+      h('h1', { text: 'Как вас представить?' }),
+      room ? null : h('label', { text: 'Код комнаты' }),
+      room ? null : h('input', { id: 'room', inputmode: 'numeric', maxlength: '6', autocomplete: 'off', placeholder: '000000', required: 'required' }),
+      h('label', { text: 'Имя' }),
+      h('input', { id: 'name', maxlength: '20', autocomplete: 'nickname', placeholder: 'Например, Аня', required: 'required' }),
+      h('button', { class: 'btn primary block', id: 'join-btn', type: 'submit', text: 'Присоединиться' }),
+      h('p', { class: 'muted', text: 'После входа это устройство запомнит вас до конца игры.' })
+    ]);
+    setScreen(h('div', { class: 'shell phone' }, [topbar(), form]));
+    var field = document.getElementById(room ? 'name' : 'room');
+    if (field) field.focus();
+  }
+
+  function onJoin(event) {
+    event.preventDefault();
+    if (sending) return;
+    var roomInput = document.getElementById('room');
+    var room = params.room || (roomInput ? roomInput.value : '');
+    room = String(room || '').replace(/\s+/g, '');
+    var name = document.getElementById('name').value;
+    var nameError = validateName(name);
+    if (!/^\d{6}$/.test(room)) {
+      toast('Введите шестизначный код комнаты');
+      return;
+    }
+    if (nameError) {
+      toast(nameError);
+      return;
+    }
+    sending = true;
+    var button = document.getElementById('join-btn');
+    button.disabled = true;
+    button.textContent = 'Подключаемся…';
+    apiRequest('joinGame', { room_code: room, name: name.trim() }).then(function (data) {
+      session = {
+        player_token: data.player_token,
+        player_id: data.player_id,
+        room_code: data.room_code,
+        name: data.name
+      };
+      params.room = data.room_code;
+      savePlayerSession(session);
+      return refresh();
+    }).catch(function (error) {
+      toast(error.message || 'Не удалось присоединиться');
+      button.disabled = false;
+      button.textContent = 'Присоединиться';
+    }).then(function () {
+      sending = false;
+      ensurePoll();
+    });
+  }
+
+  function viewOf(data) {
+    if (!data) return 'join';
+    if (data.game.status === 'finished') return 'final';
+    if (data.game.status === 'waiting') return 'wait';
+    if (data.game.question_phase === 'open') return data.submitted_answer ? 'accepted' : 'question';
+    if (data.game.question_phase === 'closed' || data.game.question_phase === 'results') return 'result';
+    return 'wait';
+  }
+
+  function render(data) {
+    var view = viewOf(data);
+    var qid = data.question ? data.question.id : '';
+    var key = view + ':' + data.game.question_phase + ':' + qid + ':' + (data.submitted_answer || '');
+    if (app.dataset.key === key) {
+      update(view, data);
+      return;
+    }
+    app.dataset.key = key;
+    if (view === 'wait') mountWait(data);
+    else if (view === 'question') mountQuestion(data);
+    else if (view === 'accepted') mountAccepted(data);
+    else if (view === 'result') mountResult(data);
+    else if (view === 'final') mountFinal(data);
+  }
+
+  function mountWait(data) {
+    document.title = 'КВИЗ · ждём старт';
+    setScreen(h('div', { class: 'shell phone' }, [
+      topbar(h('div', { class: 'pill', text: formatRoom(data.game.room_code) })),
+      h('section', { class: 'card wait' }, [
+        h('p', { class: 'eyebrow', text: data.player.name }),
+        h('h1', { text: 'Ожидаем начала игры' }),
+        h('p', { class: 'lead', id: 'wait-count', text: waitText(data) }),
+        h('div', { class: 'pulse-dot', 'aria-hidden': 'true' }),
+        h('button', {
+          class: 'btn ghost',
+          type: 'button',
+          text: 'Выйти',
+          onClick: function () {
+            if (stopPoll) stopPoll();
+            stopPoll = null;
+            clearPlayerSession(session.room_code);
+            session = null;
+            state = null;
+            renderJoin();
+          }
+        })
+      ])
+    ]));
+  }
+
+  function waitText(data) {
+    var count = data.game.player_count || 0;
+    return 'В комнате ' + count + ' ' + plural(count, 'игрок', 'игрока', 'игроков') + '. Ведущий скоро начнёт.';
+  }
+
+  function mountQuestion(data) {
+    var question = data.question;
+    document.title = 'КВИЗ · вопрос ' + question.number;
+    var options = h('div', { class: 'options stack', id: 'options' });
+    setScreen(h('div', { class: 'shell phone' }, [
+      topbar(h('div', { class: 'pill', text: 'Вопрос ' + question.number + ' из ' + question.total })),
+      h('section', { class: 'play' }, [
+        meterNode(question.number, question.total),
+        h('p', { class: 'eyebrow', text: question.points + ' баллов' }),
+        h('h1', { class: 'q-text', text: question.question }),
+        options,
+        h('p', { class: 'muted', id: 'answer-hint', text: 'Один вариант. Ведущий закроет вопрос, когда все ответят.' })
+      ])
+    ]));
+    paintOptions(options, question, { interactive: true, onPick: choose });
+  }
+
+  function choose(letter) {
+    if (sending || !state || !state.can_answer) return;
+    sending = true;
+    Array.prototype.forEach.call(document.querySelectorAll('#options .opt'), function (button) {
+      button.disabled = true;
+    });
+    apiRequest('submitAnswer', {
+      player_token: session.player_token,
+      room_code: session.room_code,
+      question_id: state.question.id,
+      answer: letter
+    }).then(function () {
+      return refresh();
+    }).catch(function (error) {
+      if (error.code === 'ALREADY_ANSWERED' || error.code === 'QUESTION_CLOSED') {
+        return refresh();
+      }
+      toast(error.message || 'Не удалось отправить ответ');
+      Array.prototype.forEach.call(document.querySelectorAll('#options .opt'), function (button) {
+        button.disabled = false;
+      });
+    }).then(function () {
+      sending = false;
+    });
+  }
+
+  function mountAccepted(data) {
+    var question = data.question;
+    document.title = 'КВИЗ · ответ принят';
+    var options = h('div', { class: 'options stack', id: 'options' });
+    setScreen(h('div', { class: 'shell phone' }, [
+      topbar(h('div', { class: 'pill', text: 'Ответ принят' })),
+      h('section', { class: 'play' }, [
+        h('p', { class: 'eyebrow', text: 'Ответ принят' }),
+        h('h1', { class: 'q-text', text: question.question }),
+        options,
+        h('p', { class: 'lead', text: 'Ждём, пока ведущий закроет вопрос.' })
+      ])
+    ]));
+    paintOptions(options, question, { interactive: false, selected: data.submitted_answer, locked: true });
+  }
+
+  function mountResult(data) {
+    var result = data.round_result || {};
+    var question = data.question;
+    document.title = 'КВИЗ · результат';
+    var title = !result.your_answer ? 'Нет ответа' : result.is_correct ? 'Верно' : 'Неверно';
+    var options = h('div', { class: 'options stack' });
+    var place = data.player.place
+      ? h('p', { class: 'lead', text: 'Сейчас вы на ' + data.player.place + ' месте · ' + data.player.total_score + ' баллов' })
+      : h('p', { class: 'lead', text: 'Смотрите рейтинг на большом экране.' });
+    setScreen(h('div', { class: 'shell phone' }, [
+      topbar(h('div', { class: 'pill', text: (result.points || 0) + ' баллов' })),
+      h('section', { class: 'play' }, [
+        h('p', { class: 'eyebrow ' + (result.is_correct ? 'good' : 'bad'), text: title }),
+        h('h1', { class: 'q-text', text: question ? question.question : 'Результат вопроса' }),
+        options,
+        h('p', { class: 'correct-line', text: question && result.correct_answer ? 'Правильный ответ: ' + question.answers[result.correct_answer] : '' }),
+        place
+      ])
+    ]));
+    if (question) {
+      paintOptions(options, question, {
+        interactive: false,
+        selected: result.your_answer,
+        correct: result.correct_answer,
+        locked: true
+      });
+    }
+  }
+
+  function mountFinal(data) {
+    document.title = 'КВИЗ · ваши итоги';
+    var finalResult = data.final_result || {};
+    var rows = finalResult.leaderboard || [];
+    var list = h('div', { id: 'board' });
+    setScreen(h('div', { class: 'shell phone' }, [
+      topbar(),
+      h('section', { class: 'play final-phone' }, [
+        h('p', { class: 'eyebrow', text: data.player.name }),
+        h('h1', { text: data.player.place + ' место' }),
+        h('p', { class: 'lead', text: data.player.total_score + ' ' + plural(data.player.total_score, 'балл', 'балла', 'баллов') }),
+        h('p', { text: winnerText(rows) }),
+        list
+      ])
+    ]));
+    renderLeaderboard(list, rows, { compact: true });
+    showConfetti();
+  }
+
+  function update(view, data) {
+    if (view === 'wait') {
+      var note = document.getElementById('wait-count');
+      if (note) note.textContent = waitText(data);
+    } else if (view === 'question' || view === 'accepted') {
+      if (data.question) updateMeter(data.question.number, data.question.total);
+      if (view === 'question' && !data.can_answer) {
+        Array.prototype.forEach.call(document.querySelectorAll('#options .opt'), function (button) {
+          button.disabled = true;
+        });
+      }
+    }
+  }
+
+  if (session && session.player_token) {
+    setScreen(h('div', { class: 'shell phone' }, [
+      topbar(),
+      h('section', { class: 'card' }, [h('h1', { text: 'Подключаемся…' })])
+    ]));
+    refresh().then(ensurePoll);
+  } else {
+    renderJoin();
+  }
+})();
