@@ -365,10 +365,11 @@ function mountQr(element, text, size, level) {
       correctLevel: level || QRCode.CorrectLevel.M
     });
     // Библиотека обводит клетки линией, и между ними появляются белые щели.
-    // Камера их не читает, поэтому рисуем клетки целыми пикселями без обводки.
+    // Готовый рисунок кладём в img: в Safari холст с height:auto часто остаётся пустым.
     paintCrispQr(element, qr._oQRCode, size || 320);
   } catch (error) {
-    element.textContent = 'Не удалось построить QR-код';
+    clearNode(element);
+    element.appendChild(h('p', { class: 'qr-error', text: 'Не удалось построить QR-код' }));
   }
 }
 
@@ -387,13 +388,26 @@ function paintCrispQr(element, model, maxPx) {
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, side, side);
   ctx.fillStyle = '#101218';
+  var dark = 0;
   for (var row = 0; row < count; row += 1) {
     for (var col = 0; col < count; col += 1) {
-      if (model.isDark(row, col)) ctx.fillRect((col + quiet) * cell, (row + quiet) * cell, cell, cell);
+      if (!model.isDark(row, col)) continue;
+      dark += 1;
+      ctx.fillRect((col + quiet) * cell, (row + quiet) * cell, cell, cell);
     }
   }
+  if (!dark) {
+    clearNode(element);
+    element.appendChild(h('p', { class: 'qr-error', text: 'Не удалось построить QR-код' }));
+    return;
+  }
+  var image = document.createElement('img');
+  image.alt = 'QR-код';
+  image.width = side;
+  image.height = side;
+  image.src = canvas.toDataURL('image/png');
   clearNode(element);
-  element.appendChild(canvas);
+  element.appendChild(image);
 }
 
 function joinPageLink() {

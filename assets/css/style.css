@@ -167,14 +167,14 @@ h2 { font-size: 28px; margin-bottom: 8px; }
   display: grid;
   place-items: center;
 }
-.qr-box canvas {
+.qr-box img, .qr-box canvas {
   display: block;
   width: min(360px, 100%);
   height: auto;
-  image-rendering: pixelated;
-  image-rendering: crisp-edges;
+  max-width: 100%;
 }
-.qr-box img, .qr-box table { display: none; }
+.qr-box table { display: none; }
+.qr-error { color: #101218; font-weight: 800; text-align: center; margin: 24px 8px; }
 .join-fallback {
   margin: 4px 0 14px;
   display: grid;
