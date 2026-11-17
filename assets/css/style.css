@@ -288,6 +288,10 @@ h2 { font-size: 28px; margin-bottom: 8px; }
 .board-wrap .avatar { width: 56px; height: 56px; }
 .board-wrap .lb-name .who { font-size: 40px; white-space: normal; overflow: visible; text-overflow: unset; }
 .q-text { font-size: clamp(28px, 4vw, 64px); line-height: 1.12; overflow-wrap: anywhere; }
+.stage-question { min-width: 0; }
+.stage-question .q-text { font-size: clamp(32px, 2.6vw, 52px); }
+.stage-question .q-text.q-mid { font-size: clamp(24px, 1.8vw, 36px); }
+.stage-question .q-text.q-long { font-size: clamp(20px, 1.4vw, 28px); line-height: 1.25; max-height: 30vh; overflow: auto; }
 .meter { height: 8px; border-radius: 999px; background: rgba(255, 255, 255, .08); overflow: hidden; margin-bottom: 14px; }
 .meter span { display: block; height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-2)); }
 
@@ -554,7 +558,7 @@ input {
   .lobby { grid-template-columns: minmax(320px, 620px) minmax(0, 1fr); align-items: start; }
   .stage { grid-template-columns: minmax(0, 1fr) 320px; align-items: start; }
   .stage-live {
-    grid-template-columns: minmax(0, 1fr) minmax(720px, 1.4fr);
+    grid-template-columns: minmax(0, 1.7fr) minmax(460px, 0.72fr);
     align-items: start;
   }
   .stage .opt, .stage-live .opt { min-height: 92px; font-size: 28px; }

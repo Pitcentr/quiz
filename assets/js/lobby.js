@@ -303,7 +303,7 @@
         h('div', { class: 'card stage-question' }, [
           meterNode(question.number, question.total),
           h('p', { class: 'eyebrow', text: question.points + ' ' + plural(question.points, 'балл', 'балла', 'баллов') }),
-          h('h1', { class: 'q-text', text: question.question }),
+          h('h1', { class: 'q-text ' + questionSizeClass(question.question), text: question.question }),
           options,
           h('p', { class: 'muted', id: 'answered-label', text: answeredText(data) })
         ]),
@@ -334,6 +334,13 @@
         answered: !!answeredById[row.player_id]
       };
     });
+  }
+
+  function questionSizeClass(text) {
+    var length = String(text || '').length;
+    if (length > 160) return 'q-long';
+    if (length > 90) return 'q-mid';
+    return '';
   }
 
   function answeredText(data) {
