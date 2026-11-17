@@ -153,7 +153,7 @@
     document.title = 'КВИЗ · ' + formatRoom(data.room_code);
     var grid = h('div', { class: 'player-grid', id: 'player-grid' });
     var screen = h('div', { class: 'shell' }, [
-      topbar(h('div', { class: 'pill', id: 'phase-pill', text: statusLabel(data.status) })),
+      topbar(screenBar(statusLabel(data.status), 'phase-pill')),
       h('section', { class: 'lobby' }, [
         h('div', { class: 'card lobby-main' }, [
           h('p', { class: 'eyebrow', text: 'Код комнаты' }),
@@ -166,7 +166,7 @@
           h('div', { class: 'qr-grid' }, [
             qrCard('Игроки', 'Сканируйте, чтобы войти', 'qr-player'),
             session.host_token
-              ? qrCard('Ведущий', 'Панель управления', 'qr-host')
+              ? qrCard('Ведущий', 'Панель управления', 'qr-host', hostFallback(data.room_code, session.host_token))
               : h('article', { class: 'qr-card' }, [
                 h('h2', { text: 'Ведущий' }),
                 h('p', { text: 'QR ведущего доступен на устройстве, где создали игру.' })
@@ -197,12 +197,51 @@
     ]);
   }
 
+  function screenBar(pillText, pillId) {
+    return h('div', { class: 'bar-actions' }, [
+      pillText ? h('div', { class: 'pill', id: pillId || '', text: pillText }) : null,
+      h('button', { class: 'btn ghost', type: 'button', text: 'Выйти', onClick: confirmLeave })
+    ]);
+  }
+
+  function confirmLeave() {
+    confirmDialog({
+      title: 'Выйти из комнаты?',
+      text: 'Экран забудет эту комнату, и можно будет создать новую. Игра на уже подключённых телефонах останется в таблице.',
+      confirmText: 'Выйти',
+      danger: true
+    }).then(function (ok) {
+      if (!ok) return;
+      if (stopPoll) stopPoll();
+      stopPoll = null;
+      clearScreenSession();
+      session = null;
+      snapshot = null;
+      renderCreate();
+    });
+  }
+
   function playerFallback(room) {
     var page = joinPageLink();
     return h('div', { class: 'join-fallback' }, [
       h('p', { class: 'fallback-title', text: 'Если QR не сработал' }),
       h('a', { class: 'join-link', href: playerLink(room), text: linkLabel(page) }),
       h('p', { class: 'muted', text: 'Откройте ссылку и введите код ' + formatRoom(room) + '.' }),
+      h('button', {
+        class: 'btn ghost',
+        type: 'button',
+        text: 'Скопировать ссылку',
+        onClick: function () { copyText(page); }
+      })
+    ]);
+  }
+
+  function hostFallback(room, token) {
+    var page = hostLink(room, token);
+    return h('div', { class: 'join-fallback host-fallback' }, [
+      h('p', { class: 'fallback-title', text: 'Если QR не сработал' }),
+      h('a', { class: 'join-link host', href: page, text: page }),
+      h('p', { class: 'muted', text: 'Откройте эту ссылку на телефоне ведущего.' }),
       h('button', {
         class: 'btn ghost',
         type: 'button',
@@ -232,7 +271,10 @@
       return;
     }
     players.forEach(function (player) {
-      var chip = h('div', { class: 'chip chip-enter', text: player.name });
+      var chip = h('div', { class: 'chip chip-enter' }, [
+        playerAvatar(player.player_id || player.name),
+        h('span', { text: player.name })
+      ]);
       container.appendChild(chip);
     });
   }
@@ -244,7 +286,7 @@
     var board = h('div', { id: 'side-board' });
     var answered = h('div', { class: 'answered-list', id: 'answered-list' });
     setScreen(h('div', { class: 'shell' }, [
-      topbar(h('div', { class: 'pill', text: 'Вопрос ' + question.number + ' из ' + question.total })),
+      topbar(screenBar('Вопрос ' + question.number + ' из ' + question.total)),
       h('section', { class: 'stage-live' }, [
         h('div', { class: 'card stage-question' }, [
           meterNode(question.number, question.total),
@@ -298,6 +340,7 @@
     }
     rows.forEach(function (row) {
       container.appendChild(h('div', { class: 'answered-row' + (row.answered ? ' done' : '') }, [
+        playerAvatar(row.player_id || row.name),
         h('span', { class: 'nm', text: row.name }),
         h('span', { class: 'dot' + (row.answered ? ' on' : ''), title: row.answered ? 'Ответил' : 'Ещё думает' })
       ]));
@@ -352,7 +395,7 @@
     document.title = 'КВИЗ · рейтинг';
     var list = h('div', { id: 'board' });
     setScreen(h('div', { class: 'shell' }, [
-      topbar(h('div', { class: 'pill', text: 'Вопрос ' + data.current_question_number + ' из ' + data.total_questions })),
+      topbar(screenBar('Вопрос ' + data.current_question_number + ' из ' + data.total_questions)),
       h('section', { class: 'board-wrap' }, [
         h('h1', { text: 'Рейтинг' }),
         list
@@ -367,7 +410,7 @@
     var podium = h('div', { class: 'podium' });
     var list = h('div', { id: 'board' });
     setScreen(h('div', { class: 'shell' }, [
-      topbar(),
+      topbar(screenBar()),
       h('section', { class: 'final' }, [
         h('p', { class: 'eyebrow', text: 'Игра окончена' }),
         h('h1', { text: winnerText(rows) }),

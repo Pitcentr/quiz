@@ -130,7 +130,10 @@
     setScreen(h('div', { class: 'shell phone' }, [
       topbar(h('div', { class: 'pill', text: formatRoom(data.game.room_code) })),
       h('section', { class: 'card wait' }, [
-        h('p', { class: 'eyebrow', text: data.player.name }),
+        h('div', { class: 'me' }, [
+          playerAvatar(data.player.player_id || data.player.name),
+          h('p', { class: 'eyebrow', text: data.player.name })
+        ]),
         h('h1', { text: 'Ожидаем начала игры' }),
         h('p', { class: 'lead', id: 'wait-count', text: waitText(data) }),
         h('div', { class: 'pulse-dot', 'aria-hidden': 'true' }),
@@ -252,7 +255,10 @@
     setScreen(h('div', { class: 'shell phone' }, [
       topbar(),
       h('section', { class: 'play final-phone' }, [
-        h('p', { class: 'eyebrow', text: data.player.name }),
+        h('div', { class: 'me' }, [
+          playerAvatar(data.player.player_id || data.player.name),
+          h('p', { class: 'eyebrow', text: data.player.name })
+        ]),
         h('h1', { text: data.player.place + ' место' }),
         h('p', { class: 'lead', text: data.player.total_score + ' ' + plural(data.player.total_score, 'балл', 'балла', 'баллов') }),
         h('p', { text: winnerText(rows) }),

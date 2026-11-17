@@ -255,6 +255,7 @@
       }
       container.appendChild(h('div', { class: 'person' }, [
         h('span', { class: markClass, text: mark }),
+        playerAvatar(player.player_id || player.name),
         h('span', { class: 'nm', text: player.name }),
         h('span', { class: 'pts', text: reveal ? String(player.points || 0) : (player.answered ? 'ответил' : '') })
       ]));

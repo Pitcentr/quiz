@@ -107,7 +107,10 @@ function renderLeaderboard(container, rows, options) {
     var last = row.last_points ? '+' + row.last_points : '0';
     var item = h('div', { class: 'lb-row' + medal + (previous.size ? '' : ' lb-enter') }, [
       h('span', { class: 'lb-place', text: String(row.place) }),
-      h('span', { class: 'lb-name', text: row.name }),
+      h('span', { class: 'lb-name' }, [
+        playerAvatar(row.player_id || row.name),
+        h('span', { class: 'who', text: row.name })
+      ]),
       h('span', { class: 'lb-last' + (row.last_points ? ' plus' : ''), text: last }),
       h('span', { class: 'lb-total', text: String(row.total_score) })
     ]);
@@ -146,8 +149,13 @@ function renderPodium(container, rows) {
     { place: 3, cls: 'third', label: '3' }
   ].forEach(function (slot) {
     var people = groups[slot.place];
+    var faces = h('div', { class: 'podium-faces' });
+    people.forEach(function (person) {
+      faces.appendChild(playerAvatar(person.player_id || person.name));
+    });
     container.appendChild(h('article', { class: 'podium-slot ' + slot.cls }, [
       h('div', { class: 'podium-rank', text: people.length ? slot.label : '—' }),
+      people.length ? faces : null,
       h('h3', { text: people.length ? people.map(function (person) { return person.name; }).join(', ') : '—' }),
       h('p', { text: people.length ? people[0].total_score + ' ' + plural(people[0].total_score, 'балл', 'балла', 'баллов') : '' })
     ]));

@@ -20,6 +20,71 @@ function clearNode(node) {
   while (node.firstChild) node.removeChild(node.firstChild);
 }
 
+function hashString(value) {
+  var hash = 2166136261;
+  var text = String(value || 'player');
+  for (var i = 0; i < text.length; i += 1) {
+    hash ^= text.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function svgNode(tag, attrs) {
+  var node = document.createElementNS('http://www.w3.org/2000/svg', tag);
+  Object.keys(attrs || {}).forEach(function (key) {
+    node.setAttribute(key, attrs[key]);
+  });
+  return node;
+}
+
+function playerAvatar(seed) {
+  var hash = hashString(seed);
+  var colors = ['#7c5cff', '#3ee0b0', '#ff5d73', '#ffb020', '#4c8dff', '#e06cff', '#ff7a45', '#46d6ff'];
+  var skins = ['#ffe1c7', '#f3c094', '#d99058', '#a86b3c', '#8d5524', '#ffe8dc'];
+  var bg = colors[hash % colors.length];
+  var skin = skins[(hash >>> 3) % skins.length];
+  var kind = (hash >>> 7) % 5;
+  var eyes = (hash >>> 11) % 3;
+  var mouth = (hash >>> 14) % 3;
+  var svg = svgNode('svg', { class: 'avatar', viewBox: '0 0 64 64', 'aria-hidden': 'true' });
+  svg.appendChild(svgNode('circle', { cx: '32', cy: '32', r: '32', fill: bg }));
+  if (kind === 1) {
+    svg.appendChild(svgNode('circle', { cx: '16', cy: '18', r: '8', fill: skin }));
+    svg.appendChild(svgNode('circle', { cx: '48', cy: '18', r: '8', fill: skin }));
+  } else if (kind === 2) {
+    svg.appendChild(svgNode('ellipse', { cx: '14', cy: '24', rx: '7', ry: '10', fill: skin }));
+    svg.appendChild(svgNode('ellipse', { cx: '50', cy: '24', rx: '7', ry: '10', fill: skin }));
+  } else if (kind === 3) {
+    svg.appendChild(svgNode('path', { d: 'M18 24 L22 8 L28 22 Z', fill: '#fff4d6' }));
+    svg.appendChild(svgNode('path', { d: 'M46 24 L42 8 L36 22 Z', fill: '#fff4d6' }));
+  } else if (kind === 4) {
+    svg.appendChild(svgNode('line', { x1: '32', y1: '14', x2: '32', y2: '4', stroke: '#fff', 'stroke-width': '3', 'stroke-linecap': 'round' }));
+    svg.appendChild(svgNode('circle', { cx: '32', cy: '4', r: '3', fill: '#fff' }));
+  }
+  svg.appendChild(svgNode('circle', { cx: '32', cy: '36', r: '16', fill: skin }));
+  if (eyes === 2) {
+    svg.appendChild(svgNode('path', { d: 'M22 34 Q26 30 30 34', fill: 'none', stroke: '#1c2233', 'stroke-width': '2', 'stroke-linecap': 'round' }));
+    svg.appendChild(svgNode('circle', { cx: '40', cy: '34', r: '2.4', fill: '#1c2233' }));
+  } else {
+    var r = eyes === 1 ? '3.2' : '2.3';
+    svg.appendChild(svgNode('circle', { cx: '26', cy: '34', r: r, fill: '#1c2233' }));
+    svg.appendChild(svgNode('circle', { cx: '40', cy: '34', r: r, fill: '#1c2233' }));
+  }
+  if (mouth === 1) {
+    svg.appendChild(svgNode('path', { d: 'M27 44 H37', fill: 'none', stroke: '#1c2233', 'stroke-width': '2', 'stroke-linecap': 'round' }));
+  } else if (mouth === 2) {
+    svg.appendChild(svgNode('ellipse', { cx: '32', cy: '45', rx: '4', ry: '3', fill: '#1c2233' }));
+  } else {
+    svg.appendChild(svgNode('path', { d: 'M26 43 Q32 49 38 43', fill: 'none', stroke: '#1c2233', 'stroke-width': '2', 'stroke-linecap': 'round' }));
+  }
+  if ((hash >>> 18) % 2 === 0) {
+    svg.appendChild(svgNode('circle', { cx: '22', cy: '40', r: '2', fill: '#ff8aa0', opacity: '0.8' }));
+    svg.appendChild(svgNode('circle', { cx: '42', cy: '40', r: '2', fill: '#ff8aa0', opacity: '0.8' }));
+  }
+  return svg;
+}
+
 function plural(n, one, few, many) {
   var n10 = n % 10;
   var n100 = n % 100;
