@@ -585,6 +585,176 @@ input {
   h1 { overflow-wrap: anywhere; }
 }
 
+/* Телевизор 960×540: вопрос и рейтинг в один экран, без внутренней прокрутки. */
+@media (max-width: 1024px) and (max-height: 640px) {
+  .page-tv { font-size: 14px; }
+  .page-tv .shell {
+    width: 100%;
+    height: 100dvh;
+    padding: 8px 10px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .page-tv .shell > .stage-live,
+  .page-tv .shell > .lobby,
+  .page-tv .shell > .reveal,
+  .page-tv .shell > .board-wrap,
+  .page-tv .shell > .final {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+  .page-tv .topbar { margin-bottom: 6px; gap: 8px; }
+  .page-tv .logo { width: 28px; height: 28px; border-radius: 8px; font-size: 14px; }
+  .page-tv .brand { gap: 8px; }
+  .page-tv .brand strong { font-size: 14px; letter-spacing: .04em; }
+  .page-tv .brand small { font-size: 11px; }
+  .page-tv .btn { min-height: 32px; padding: 4px 10px; border-radius: 10px; font-size: 13px; }
+  .page-tv .pill { padding: 4px 10px; font-size: 13px; }
+  .page-tv .card { padding: 8px 10px; border-radius: 16px; }
+  .page-tv h1 { font-size: clamp(22px, 3.4vw, 32px); margin-bottom: 6px; }
+  .page-tv h2 { font-size: 18px; margin-bottom: 4px; }
+  .page-tv .eyebrow { font-size: 11px; margin-bottom: 2px; }
+  .page-tv .lead { font-size: 14px; }
+  .page-tv .home-card { margin-top: 0; overflow: auto; }
+  .page-tv .steps { gap: 6px; margin: 10px 0; }
+  .page-tv .num { width: 24px; height: 24px; font-size: 13px; }
+
+  .page-tv .stage-live {
+    display: grid;
+    grid-template-columns: minmax(0, 0.82fr) minmax(0, 1.18fr);
+    gap: 8px;
+    align-items: stretch;
+  }
+  .page-tv .stage-question,
+  .page-tv .stage-rail {
+    height: 100%;
+    min-height: 0;
+    min-width: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .page-tv .meter { height: 4px; margin-bottom: 4px; }
+  .page-tv .stage-question .q-text {
+    font-size: clamp(16px, 2.2vw, 22px);
+    line-height: 1.15;
+    margin-bottom: 6px;
+  }
+  .page-tv .stage-question .q-text.q-mid { font-size: clamp(14px, 1.8vw, 18px); }
+  .page-tv .stage-question .q-text.q-long {
+    font-size: clamp(13px, 1.5vw, 16px);
+    line-height: 1.2;
+    max-height: 18vh;
+    overflow: auto;
+  }
+  .page-tv .stage-live .options.stack {
+    flex: 1 1 auto;
+    min-height: 0;
+    gap: 6px;
+  }
+  .page-tv .stage-live .opt {
+    flex: 1 1 0;
+    min-height: 0;
+    padding: 4px 10px;
+    font-size: 15px;
+    border-radius: 12px;
+    gap: 8px;
+  }
+  .page-tv .stage-live .opt .key { width: 26px; height: 26px; border-radius: 8px; font-size: 13px; }
+  .page-tv .stage-question .muted { margin: 4px 0 0; font-size: 12px; }
+  .page-tv .stage-rail h2 { font-size: 18px; }
+  .page-tv .stage-rail .lb {
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: none;
+    overflow: hidden;
+    gap: 3px;
+    align-content: start;
+  }
+  .page-tv .lb.with-status .lb-head,
+  .page-tv .lb.with-status .lb-row,
+  .page-tv .lb.with-status.scores-only .lb-head,
+  .page-tv .lb.with-status.scores-only .lb-row {
+    grid-template-columns: 42px minmax(0, 1fr) 58px 44px;
+    gap: 6px;
+    font-size: 13px;
+  }
+  .page-tv .stage-rail .lb-head { white-space: nowrap; }
+  .page-tv .lb.with-status .lb-row { padding: 3px 8px; border-radius: 10px; }
+  .page-tv .lb.with-status .avatar { width: 22px; height: 22px; }
+  .page-tv .lb.with-status .who { font-size: 15px; }
+  .page-tv .lb-head { font-size: 11px; padding: 0 8px; }
+  .page-tv .lb-status { min-width: 0; font-size: 11px; padding: 2px 6px; }
+
+  .page-tv .lobby {
+    display: grid;
+    grid-template-columns: minmax(0, 1.35fr) minmax(200px, 0.65fr);
+    gap: 8px;
+    align-items: stretch;
+  }
+  .page-tv .lobby-main,
+  .page-tv .players-panel { min-height: 0; overflow: auto; }
+  .page-tv .room-code { font-size: 44px; margin: 0 0 4px; }
+  .page-tv .code-actions { margin-bottom: 4px; }
+  .page-tv .qr-grid { gap: 8px; margin-top: 6px; }
+  .page-tv .qr-card { padding: 6px; border-radius: 12px; }
+  .page-tv .qr-card h2 { font-size: 14px; }
+  .page-tv .qr-card p { font-size: 12px; }
+  .page-tv .qr-box { padding: 4px; margin-bottom: 4px; border-radius: 10px; }
+  .page-tv .qr-box img, .page-tv .qr-box canvas { width: min(118px, 100%); }
+  .page-tv .join-fallback { padding: 6px 8px; margin: 2px 0 6px; gap: 2px; border-radius: 10px; }
+  .page-tv .lobby-main > .join-fallback > .muted { display: none; }
+  .page-tv .qr-card .host-fallback { padding: 4px 6px; margin: 4px 0 0; }
+  .page-tv .qr-card .host-fallback .fallback-title,
+  .page-tv .qr-card .host-fallback .join-link,
+  .page-tv .qr-card .host-fallback .muted { display: none; }
+  .page-tv .qr-card .host-fallback .btn { min-height: 26px; width: 100%; }
+  .page-tv .join-link, .page-tv .join-link.host { font-size: 12px; }
+  .page-tv .chip { padding: 4px 8px; font-size: 14px; gap: 6px; }
+  .page-tv .avatar { width: 22px; height: 22px; }
+  .page-tv .players-panel { min-height: 0; }
+
+  .page-tv .reveal { min-height: 0; gap: 4px; }
+  .page-tv .reveal-count { font-size: clamp(88px, 32vh, 168px); }
+  .page-tv .reveal h1 { font-size: clamp(26px, 4.6vw, 44px); }
+  .page-tv .reveal.answer h1 { font-size: clamp(28px, 5vw, 52px); max-width: 16ch; }
+  .page-tv .reveal-letter { width: 44px; height: 44px; border-radius: 12px; font-size: 22px; }
+
+  .page-tv .board-wrap {
+    width: 100%;
+    padding: 0 12px 4px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .page-tv .board-wrap h1 { font-size: 22px; }
+  .page-tv .board-wrap .lb {
+    flex: 1 1 auto;
+    min-height: 0;
+    max-height: none;
+    overflow: auto;
+    padding: 2px 8px 6px;
+    gap: 3px;
+  }
+  .page-tv .board-wrap .lb-head,
+  .page-tv .board-wrap .lb-row {
+    font-size: 15px;
+    grid-template-columns: 40px minmax(0, 1fr) 72px 72px;
+    gap: 8px;
+  }
+  .page-tv .board-wrap .lb-row { padding: 4px 8px; }
+  .page-tv .board-wrap .avatar { width: 24px; height: 24px; }
+  .page-tv .board-wrap .lb-name .who { font-size: 17px; }
+
+  .page-tv .final { overflow: auto; text-align: center; }
+  .page-tv .podium { gap: 8px; margin: 4px 0 8px; }
+  .page-tv .podium-slot { min-height: 64px; padding: 8px; border-radius: 14px; }
+  .page-tv .podium-slot.first { min-height: 84px; }
+  .page-tv .podium-rank { font-size: 22px; }
+  .page-tv .podium-slot h3 { font-size: 16px; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation: none !important;
