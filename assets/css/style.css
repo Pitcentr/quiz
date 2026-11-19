@@ -417,8 +417,25 @@ h2 { font-size: 28px; margin-bottom: 8px; }
 }
 .lb-status.ok { color: #064; background: #3ee0b0; }
 .lb-status.wait { color: #3a2a04; background: #ffd15c; }
+.lb-row { position: relative; }
 .lb-row.awarding {
   box-shadow: 0 0 0 2px rgba(62, 224, 176, .85), 0 0 24px rgba(62, 224, 176, .25);
+}
+.lb-stars { position: absolute; inset: 0; pointer-events: none; }
+.lb-star {
+  position: absolute;
+  left: 34%;
+  top: 18%;
+  color: #ffd56a;
+  font-size: 20px;
+  line-height: 1;
+  text-shadow: 0 0 8px rgba(255, 213, 106, .85);
+  animation: star-pop .9s ease-out forwards;
+}
+@keyframes star-pop {
+  0% { opacity: 0; transform: translate(0, 8px) scale(.35); }
+  25% { opacity: 1; }
+  100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(1.05); }
 }
 .lb-name { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .lb-name .who { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

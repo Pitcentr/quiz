@@ -471,7 +471,6 @@ var serverClockOffset = 0;
 var audioCtx = null;
 var COUNTDOWN_MS = 5000;
 var ANSWER_MS = 5000;
-var BOARD_MS = 6000;
 
 function noteServerTime(isoTime) {
   var parsed = Date.parse(isoTime || '');
@@ -515,8 +514,8 @@ function armAutoAdvance(state, data, credentials, onDone) {
   clearAutoAdvance(state);
   state.key = key;
   var delay = data.question_phase === 'closed'
-    ? Math.max(0, COUNTDOWN_MS + ANSWER_MS + BOARD_MS - elapsedSince(data.question_closed_at))
-    : BOARD_MS;
+    ? Math.max(0, COUNTDOWN_MS + ANSWER_MS - elapsedSince(data.question_closed_at))
+    : 0;
   state.timer = setTimeout(function () {
     state.timer = null;
     sendAdvance(data.is_last_question ? 'finishGame' : 'nextQuestion', credentials, 0, onDone);
@@ -566,9 +565,10 @@ function playTone(freq, duration, type, volume) {
   osc.stop(now + duration);
 }
 
-function playTick() {
-  playTone(180, 0.045, 'square', 0.03);
-  playTone(880, 0.06, 'sine', 0.05);
+function playTick(beat) {
+  var last = beat === 1;
+  playTone(last ? 523 : 880, last ? 0.16 : 0.1, 'sine', 0.14);
+  playTone(last ? 784 : 1320, last ? 0.22 : 0.08, 'triangle', 0.07);
 }
 
 function playReveal() {

@@ -22,6 +22,25 @@ function rankedRows(rows) {
   return copy;
 }
 
+function spawnStars(item, count) {
+  var layer = document.createElement('span');
+  layer.className = 'lb-stars';
+  layer.setAttribute('aria-hidden', 'true');
+  for (var i = 0; i < count; i += 1) {
+    var star = document.createElement('span');
+    star.className = 'lb-star';
+    star.textContent = '★';
+    star.style.setProperty('--dx', Math.round(Math.random() * 84 - 24) + 'px');
+    star.style.setProperty('--dy', Math.round(-16 - Math.random() * 22) + 'px');
+    star.style.animationDelay = (i * 0.07) + 's';
+    layer.appendChild(star);
+  }
+  item.appendChild(layer);
+  setTimeout(function () {
+    if (layer.parentNode) layer.remove();
+  }, 1300);
+}
+
 function animateAward(container, rows) {
   var byId = {};
   (rows || []).forEach(function (row) { byId[row.player_id] = row; });
@@ -29,19 +48,19 @@ function animateAward(container, rows) {
     var row = byId[item.dataset.id];
     if (!row || !row.last_points) return;
     item.classList.add('awarding');
+    spawnStars(item, Math.min(8, Math.max(4, Math.round(row.last_points / 40))));
     var totalNode = item.querySelector('.lb-total');
     var from = row.total_score - row.last_points;
     var to = row.total_score;
-    var start = null;
+    var start = Date.now();
     setTimeout(playCoin, index * 90);
-    function frame(now) {
-      if (start === null) start = now;
-      var t = Math.min(1, (now - start) / 800);
+    function frame() {
+      var t = Math.min(1, (Date.now() - start) / 800);
       var eased = 1 - Math.pow(1 - t, 3);
       if (totalNode) totalNode.textContent = String(Math.round(from + (to - from) * eased));
-      if (t < 1) requestAnimationFrame(frame);
+      if (t < 1) setTimeout(frame, 40);
     }
-    requestAnimationFrame(frame);
+    frame();
   });
 }
 
@@ -59,7 +78,8 @@ function renderLeaderboard(container, rows, options) {
     });
     renderLeaderboard(container, rankedRows(preview), {
       compact: options.compact,
-      scoresOnly: options.scoresOnly
+      scoresOnly: options.scoresOnly,
+      showStatus: options.showStatus
     });
     setTimeout(function () {
       if (!container.isConnected) return;
@@ -68,6 +88,7 @@ function renderLeaderboard(container, rows, options) {
       renderLeaderboard(container, rows, {
         compact: options.compact,
         scoresOnly: options.scoresOnly,
+        showStatus: options.showStatus,
         award: true
       });
       playAward();

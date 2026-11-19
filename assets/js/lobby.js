@@ -8,6 +8,7 @@
   var heardQuestion = '';
   var heardAnswers = 0;
   var advanceState = { timer: null, key: '' };
+  var closedBoard = null;
 
   function stopReveal() {
     if (revealClock) {
@@ -133,17 +134,16 @@
     if (data.status === 'finished') return 'final';
     if (data.status === 'waiting') return 'lobby';
     if (data.question_phase === 'open') return 'question';
-    if (data.question_phase === 'results') return 'ceremony';
-    if (data.question_phase === 'closed') {
+    if (data.question_phase === 'closed' || data.question_phase === 'results') {
       if (countdownRemaining(data.question_closed_at) > 0) return 'countdown';
-      if (revealRemaining(data.question_closed_at) > 0) return 'answer';
-      return 'ceremony';
+      return 'answer';
     }
     return 'lobby';
   }
 
   function render(data) {
     closeIfEveryoneAnswered(data, session, refresh);
+    rememberClosedBoard(data);
     armAutoAdvance(advanceState, data, session, refresh);
     var view = viewOf(data);
     var qid = data.question ? data.question.id : '';
@@ -157,7 +157,6 @@
     else if (view === 'question') mountQuestion(data);
     else if (view === 'countdown') mountCountdown(data);
     else if (view === 'answer') mountAnswer(data);
-    else if (view === 'ceremony') mountCeremony(data);
     else if (view === 'final') mountFinal(data);
   }
 
@@ -314,9 +313,57 @@
       ])
     ]));
     paintOptions(options, question, { interactive: false });
-    renderLeaderboard(board, ratedRows(data), { scoresOnly: true, showStatus: true });
+    var award = awardRowsFor(data);
+    renderLeaderboard(board, award || ratedRows(data), {
+      scoresOnly: true,
+      showStatus: true,
+      ceremony: !!award
+    });
+    if (award) releaseCeremony(board);
     rememberAnswers(data, true);
     startWaitBed();
+  }
+
+  function rememberClosedBoard(data) {
+    if (!data || data.status !== 'active' || !data.question) return;
+    if (data.question_phase !== 'closed' && data.question_phase !== 'results') return;
+    closedBoard = {
+      questionId: data.question.id,
+      rows: (data.leaderboard || []).map(function (row) {
+        return {
+          player_id: row.player_id,
+          last_points: Number(row.last_points) || 0
+        };
+      })
+    };
+  }
+
+  function awardRowsFor(data) {
+    if (!closedBoard || !data.question || closedBoard.questionId === data.question.id) return null;
+    var gained = {};
+    var any = false;
+    closedBoard.rows.forEach(function (row) {
+      gained[row.player_id] = row.last_points;
+      if (row.last_points > 0) any = true;
+    });
+    closedBoard = null;
+    if (!any) return null;
+    return ratedRows(data).map(function (row) {
+      return {
+        player_id: row.player_id,
+        name: row.name,
+        place: row.place,
+        total_score: row.total_score,
+        last_points: gained[row.player_id] || 0,
+        answered: !!row.answered
+      };
+    });
+  }
+
+  function releaseCeremony(container) {
+    setTimeout(function () {
+      if (container.isConnected) delete container.dataset.ceremony;
+    }, 1800);
   }
 
   function ratedRows(data) {
@@ -373,7 +420,7 @@
         h('div', { class: 'reveal-count pop', id: 'reveal-count', text: String(beatNumber(countdownRemaining(data.question_closed_at))) })
       ])
     ]));
-    playTick();
+    playTick(lastBeat(data));
     var last = beatNumber(countdownRemaining(data.question_closed_at));
     revealClock = setInterval(function () {
       if (!snapshot) return;
@@ -391,8 +438,12 @@
       node.classList.remove('pop');
       void node.offsetWidth;
       node.classList.add('pop');
-      playTick();
+      playTick(num);
     }, 80);
+  }
+
+  function lastBeat(data) {
+    return beatNumber(countdownRemaining(data.question_closed_at));
   }
 
   function mountAnswer(data) {
@@ -415,20 +466,6 @@
         render(snapshot);
       }
     }, 80);
-  }
-
-  function mountCeremony(data) {
-    document.title = 'КВИЗ · рейтинг';
-    var list = h('div', { id: 'board' });
-    setScreen(h('div', { class: 'shell' }, [
-      topbar(screenBar('Вопрос ' + data.current_question_number + ' из ' + data.total_questions)),
-      h('section', { class: 'board-wrap' }, [
-        h('h1', { text: 'Рейтинг' }),
-        list
-      ])
-    ]));
-    renderLeaderboard(list, data.leaderboard || [], { ceremony: true });
-    playRankOpen();
   }
 
   function mountFinal(data) {
@@ -466,7 +503,9 @@
       ])
     ]));
     renderPodium(podium, rows);
-    renderLeaderboard(list, rows);
+    var hasAward = rows.some(function (row) { return Number(row.last_points) > 0; });
+    renderLeaderboard(list, rows, { ceremony: hasAward });
+    if (hasAward) releaseCeremony(list);
     showConfetti();
   }
 
@@ -482,12 +521,12 @@
       var label = document.getElementById('answered-label');
       if (label) label.textContent = answeredText(data);
       var side = document.getElementById('side-board');
-      if (side) renderLeaderboard(side, ratedRows(data), { scoresOnly: true, showStatus: true });
+      if (side && !side.dataset.ceremony) renderLeaderboard(side, ratedRows(data), { scoresOnly: true, showStatus: true });
       if (data.question) updateMeter(data.question.number, data.question.total);
       rememberAnswers(data, false);
-    } else if (view === 'ceremony' || view === 'final') {
+    } else if (view === 'final') {
       var board = document.getElementById('board');
-      if (board && board.dataset.ceremony !== 'preview') renderLeaderboard(board, data.leaderboard || []);
+      if (board && !board.dataset.ceremony) renderLeaderboard(board, data.leaderboard || []);
     }
   }
 
