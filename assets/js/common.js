@@ -427,18 +427,32 @@ function paintOptions(container, question, options) {
   clearNode(container);
   ['A', 'B', 'C', 'D'].forEach(function (letter) {
     var className = 'opt ' + letter.toLowerCase();
+    var people = options.faces && options.faces[letter];
     if (options.selected === letter) className += ' picked';
     if (options.correct && options.correct === letter) className += ' right';
+    if (options.blink && options.correct === letter) className += ' blink';
     if (options.correct && options.selected === letter && options.selected !== options.correct) className += ' bad';
+    if (people && people.length) className += ' has-faces';
+    var children = [
+      h('span', { class: 'key', text: letter }),
+      h('span', { class: 'label', text: question.answers[letter] || '' })
+    ];
+    if (people && people.length) {
+      children.push(h('span', { class: 'faces' }, people.map(function (player, index) {
+        var face = h('span', { class: 'face', title: player.name }, [
+          playerAvatar(player.player_id || player.name),
+          h('span', { class: 'face-name', text: player.name })
+        ]);
+        face.style.animationDelay = Math.min(index, 8) * 45 + 'ms';
+        return face;
+      })));
+    }
     var button = h('button', {
       type: 'button',
       class: className,
       'data-letter': letter,
       onClick: options.interactive ? function () { options.onPick(letter); } : null
-    }, [
-      h('span', { class: 'key', text: letter }),
-      h('span', { class: 'label', text: question.answers[letter] || '' })
-    ]);
+    }, children);
     if (!options.interactive || options.locked) button.disabled = true;
     container.appendChild(button);
   });
@@ -469,8 +483,7 @@ function clearConfetti() {
 
 var serverClockOffset = 0;
 var audioCtx = null;
-var COUNTDOWN_MS = 5000;
-var ANSWER_MS = 5000;
+var REVEAL_MS = 5000;
 
 function noteServerTime(isoTime) {
   var parsed = Date.parse(isoTime || '');
@@ -487,12 +500,8 @@ function elapsedSince(closedAt) {
   return serverNow() - closed;
 }
 
-function countdownRemaining(closedAt) {
-  return Math.max(0, COUNTDOWN_MS - elapsedSince(closedAt));
-}
-
 function revealRemaining(closedAt) {
-  return Math.max(0, COUNTDOWN_MS + ANSWER_MS - elapsedSince(closedAt));
+  return Math.max(0, REVEAL_MS - elapsedSince(closedAt));
 }
 
 function clearAutoAdvance(state) {
@@ -514,7 +523,7 @@ function armAutoAdvance(state, data, credentials, onDone) {
   clearAutoAdvance(state);
   state.key = key;
   var delay = data.question_phase === 'closed'
-    ? Math.max(0, COUNTDOWN_MS + ANSWER_MS - elapsedSince(data.question_closed_at))
+    ? revealRemaining(data.question_closed_at)
     : 0;
   state.timer = setTimeout(function () {
     state.timer = null;
@@ -586,6 +595,49 @@ function playAnswerShow() {
   [523, 659, 784, 1047].forEach(function (freq, index) {
     setTimeout(function () { playTone(freq, 0.32, 'triangle', 0.06); }, 90 + index * 130);
   });
+}
+
+function playGong() {
+  var ctx = audioContext();
+  if (!ctx) return;
+  var now = ctx.currentTime;
+  var master = ctx.createGain();
+  master.gain.setValueAtTime(0.0001, now);
+  master.gain.exponentialRampToValueAtTime(0.7, now + 0.02);
+  master.gain.exponentialRampToValueAtTime(0.0001, now + 2.4);
+  master.connect(ctx.destination);
+  [92, 138, 184, 233, 294, 370].forEach(function (freq, index) {
+    var osc = ctx.createOscillator();
+    var gain = ctx.createGain();
+    osc.type = index % 2 ? 'triangle' : 'sine';
+    osc.frequency.setValueAtTime(freq * 1.03, now);
+    osc.frequency.exponentialRampToValueAtTime(freq, now + 1.5);
+    gain.gain.setValueAtTime(index === 0 ? 0.85 : 0.22 / index, now);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 2.2 - index * 0.12);
+    osc.connect(gain);
+    gain.connect(master);
+    osc.start(now);
+    osc.stop(now + 2.4);
+  });
+  var duration = 0.16;
+  var length = Math.floor(ctx.sampleRate * duration);
+  var buffer = ctx.createBuffer(1, length, ctx.sampleRate);
+  var data = buffer.getChannelData(0);
+  for (var i = 0; i < length; i += 1) data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, 2);
+  var noise = ctx.createBufferSource();
+  var filter = ctx.createBiquadFilter();
+  var noiseGain = ctx.createGain();
+  noise.buffer = buffer;
+  filter.type = 'bandpass';
+  filter.frequency.value = 220;
+  filter.Q.value = 0.7;
+  noiseGain.gain.setValueAtTime(0.4, now);
+  noiseGain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+  noise.connect(filter);
+  filter.connect(noiseGain);
+  noiseGain.connect(master);
+  noise.start(now);
+  noise.stop(now + duration);
 }
 
 function playRankOpen() {

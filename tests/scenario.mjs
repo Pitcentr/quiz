@@ -195,6 +195,7 @@ async function main() {
         check(Array.isArray(live.data.leaderboard) && live.data.leaderboard.length === 10, 'screen shows the standing during the question');
         check(!live.data.question.correct_answer, 'standing does not include the answer');
         check(live.data.players.filter((player) => player.answered).length === 9, 'screen knows who already answered');
+        check(live.data.players.every((player) => player.answer === undefined), 'choices stay hidden while the question is open');
       }
 
     const before = new Map(expected);
@@ -232,15 +233,19 @@ async function main() {
     const screen = await engine.handle('getGame', { room_code: room });
     check(screen.data.question.correct_answer === question.correct_answer, 'screen receives the answer after close');
     check(screen.data.leaderboard.length === 10, 'screen has the new ranking');
+    const picks = screen.data.players.filter((player) => player.answered);
+    check(picks.length === 9 && picks.every((player) => /^[ABCD]$/.test(player.answer)), 'screen receives the chosen answers');
+    check(screen.data.players.some((player) => player.answered === false && player.answer === null), 'screen marks a missing choice');
+    check(!screen.data.players.some((player) => Object.prototype.hasOwnProperty.call(player, 'is_correct')), 'screen does not receive per-player scoring');
     if (number === 1) {
       const tooSoon = await engine.handle('nextQuestion', { host_token: hostToken, room_code: room });
       check(tooSoon.error && tooSoon.error.code === 'REVEAL_IN_PROGRESS', 'next question waits for the reveal');
-      now += 5000;
-      const answerStillUp = await engine.handle('nextQuestion', { host_token: hostToken, room_code: room });
-      check(answerStillUp.error && answerStillUp.error.code === 'REVEAL_IN_PROGRESS', 'answer stays on screen for five more seconds');
-      now += 5000;
+      now += 4999;
+      const stillUp = await engine.handle('nextQuestion', { host_token: hostToken, room_code: room });
+      check(stillUp.error && stillUp.error.code === 'REVEAL_IN_PROGRESS', 'choices stay on screen until the countdown ends');
+      now += 1;
     } else {
-      now += 10000;
+      now += 5000;
     }
     if (number === 1) {
       const shown = await engine.handle('showResults', { host_token: hostToken, room_code: room });

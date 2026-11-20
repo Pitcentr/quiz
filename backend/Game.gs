@@ -46,7 +46,7 @@ function playerViews_(game, role) {
   var answers = currentAnswers_(game);
   var byPlayer = {};
   answers.forEach(function (answer) { byPlayer[answer.player_id] = answer; });
-  var revealChoice = role === 'host' && (game.question_phase === 'closed' || game.question_phase === 'results');
+  var showPicks = game.question_phase === 'closed' || game.question_phase === 'results' || game.status === 'finished';
   return dbPlayers_(game.game_id).map(function (player) {
     var answer = byPlayer[player.player_id];
     var view = {
@@ -55,8 +55,8 @@ function playerViews_(game, role) {
       total_score: Number(player.total_score) || 0,
       answered: !!answer
     };
-    if (revealChoice) {
-      view.answer = answer ? answer.answer : null;
+    if (showPicks) view.answer = answer ? answer.answer : null;
+    if (role === 'host' && showPicks) {
       view.is_correct = !!(answer && answer.is_correct);
       view.points = answer && isScored_(answer) ? Number(answer.points) : 0;
     }
@@ -174,8 +174,8 @@ function nextQuestion_(params) {
     }
     if (game.question_phase === 'closed') {
       var closedAt = Date.parse(game.question_closed_at);
-      if (isNaN(closedAt) || Date.now() < closedAt + CONFIG.REVEAL_MS + CONFIG.ANSWER_MS) {
-        throwApp_('REVEAL_IN_PROGRESS', 'На экране ещё отсчёт и ответ');
+      if (isNaN(closedAt) || Date.now() < closedAt + CONFIG.REVEAL_MS) {
+        throwApp_('REVEAL_IN_PROGRESS', 'На экране ещё показ ответа');
       }
     }
     var index = -1;
@@ -203,8 +203,8 @@ function finishGame_(params) {
     }
     if (game.question_phase === 'closed') {
       var closedAt = Date.parse(game.question_closed_at);
-      if (isNaN(closedAt) || Date.now() < closedAt + CONFIG.REVEAL_MS + CONFIG.ANSWER_MS) {
-        throwApp_('REVEAL_IN_PROGRESS', 'На экране ещё отсчёт и ответ');
+      if (isNaN(closedAt) || Date.now() < closedAt + CONFIG.REVEAL_MS) {
+        throwApp_('REVEAL_IN_PROGRESS', 'На экране ещё показ ответа');
       }
     }
     game.status = 'finished';

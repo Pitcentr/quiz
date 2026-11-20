@@ -134,10 +134,7 @@
     if (data.status === 'finished') return 'final';
     if (data.status === 'waiting') return 'lobby';
     if (data.question_phase === 'open') return 'question';
-    if (data.question_phase === 'closed' || data.question_phase === 'results') {
-      if (countdownRemaining(data.question_closed_at) > 0) return 'countdown';
-      return 'answer';
-    }
+    if (data.question_phase === 'closed' || data.question_phase === 'results') return 'picks';
     return 'lobby';
   }
 
@@ -155,8 +152,7 @@
     app.dataset.key = key;
     if (view === 'lobby') mountLobby(data);
     else if (view === 'question') mountQuestion(data);
-    else if (view === 'countdown') mountCountdown(data);
-    else if (view === 'answer') mountAnswer(data);
+    else if (view === 'picks') mountPicks(data);
     else if (view === 'final') mountFinal(data);
   }
 
@@ -412,25 +408,50 @@
     return Math.max(1, Math.min(5, Math.ceil(left / 1000)));
   }
 
-  function mountCountdown(data) {
-    document.title = 'КВИЗ · отсчёт';
+  function facesByLetter(data) {
+    var groups = { A: [], B: [], C: [], D: [] };
+    (data.players || []).forEach(function (player) {
+      if (groups[player.answer]) groups[player.answer].push(player);
+    });
+    return groups;
+  }
+
+  function mountPicks(data) {
+    var question = data.question || {};
+    document.title = 'КВИЗ · кто что выбрал';
+    var options = h('div', { class: 'options picks', id: 'options' });
+    var count = beatNumber(revealRemaining(data.question_closed_at));
     setScreen(h('div', { class: 'shell' }, [
-      h('section', { class: 'reveal' }, [
-        h('p', { class: 'eyebrow', text: 'Правильный ответ через' }),
-        h('div', { class: 'reveal-count pop', id: 'reveal-count', text: String(beatNumber(countdownRemaining(data.question_closed_at))) })
+      topbar(screenBar('Вопрос ' + (question.number || '') + ' из ' + (question.total || ''))),
+      h('section', { class: 'pick-board' }, [
+        h('div', { class: 'card pick-question' }, [
+          h('h1', { class: 'q-text ' + questionSizeClass(question.question), text: question.question || '' }),
+          options
+        ]),
+        h('div', { class: 'count-dock' }, [
+          h('div', {
+            class: 'count-orb pop',
+            id: 'reveal-count',
+            role: 'timer',
+            'aria-label': 'До следующего вопроса',
+            text: String(count)
+          })
+        ])
       ])
     ]));
-    playTick(lastBeat(data));
-    var last = beatNumber(countdownRemaining(data.question_closed_at));
+    if (question.answers) {
+      paintOptions(options, question, {
+        interactive: false,
+        correct: question.correct_answer,
+        blink: true,
+        faces: facesByLetter(data)
+      });
+    }
+    playGong();
+    var last = count;
     revealClock = setInterval(function () {
       if (!snapshot) return;
-      var left = countdownRemaining(snapshot.question_closed_at);
-      if (left <= 0) {
-        stopReveal();
-        render(snapshot);
-        return;
-      }
-      var num = beatNumber(left);
+      var num = beatNumber(revealRemaining(snapshot.question_closed_at));
       var node = document.getElementById('reveal-count');
       if (!node || num === last) return;
       last = num;
@@ -439,32 +460,6 @@
       void node.offsetWidth;
       node.classList.add('pop');
       playTick(num);
-    }, 80);
-  }
-
-  function lastBeat(data) {
-    return beatNumber(countdownRemaining(data.question_closed_at));
-  }
-
-  function mountAnswer(data) {
-    document.title = 'КВИЗ · правильный ответ';
-    var question = data.question || {};
-    var letter = question.correct_answer || '';
-    var answer = letter && question.answers ? question.answers[letter] : '';
-    setScreen(h('div', { class: 'shell' }, [
-      h('section', { class: 'reveal answer' }, [
-        h('p', { class: 'eyebrow', text: 'Правильный ответ' }),
-        letter ? h('p', { class: 'reveal-letter', text: letter }) : null,
-        h('h1', { text: answer || 'Ответ зафиксирован' })
-      ])
-    ]));
-    playAnswerShow();
-    revealClock = setInterval(function () {
-      if (!snapshot) return;
-      if (revealRemaining(snapshot.question_closed_at) <= 0) {
-        stopReveal();
-        render(snapshot);
-      }
     }, 80);
   }
 

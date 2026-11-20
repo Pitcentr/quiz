@@ -13,7 +13,6 @@ import { fileURLToPath } from 'node:url';
 const VERSION = '1.0.0';
 const MAX_PLAYERS = 20;
 const REVEAL_MS = 5000;
-const ANSWER_MS = 5000;
 const MIN_NAME = 2;
 const MAX_NAME = 20;
 
@@ -304,7 +303,7 @@ export function createQuizEngine(options = {}) {
   function playerViews(game, role) {
     const answers = currentAnswers(game);
     const byPlayer = new Map(answers.map((answer) => [answer.player_id, answer]));
-    const revealChoice = role === 'host' && ['closed', 'results'].includes(game.question_phase);
+    const showPicks = ['closed', 'results'].includes(game.question_phase) || game.status === 'finished';
     return playersFor(game.game_id).map((player) => {
       const answer = byPlayer.get(player.player_id);
       const view = {
@@ -313,8 +312,8 @@ export function createQuizEngine(options = {}) {
         total_score: Number(player.total_score) || 0,
         answered: Boolean(answer)
       };
-      if (revealChoice) {
-        view.answer = answer ? answer.answer : null;
+      if (showPicks) view.answer = answer ? answer.answer : null;
+      if (role === 'host' && showPicks) {
         view.is_correct = Boolean(answer && answer.is_correct);
         view.points = answer && isScored(answer) ? Number(answer.points) : 0;
       }
@@ -579,8 +578,8 @@ export function createQuizEngine(options = {}) {
       }
       if (game.question_phase === 'closed') {
         const closedAt = Date.parse(game.question_closed_at);
-        if (Number.isNaN(closedAt) || nowMs() < closedAt + REVEAL_MS + ANSWER_MS) {
-          throwApp('REVEAL_IN_PROGRESS', 'На экране ещё отсчёт и ответ');
+        if (Number.isNaN(closedAt) || nowMs() < closedAt + REVEAL_MS) {
+          throwApp('REVEAL_IN_PROGRESS', 'На экране ещё показ ответа');
         }
       }
       const index = game.questions.findIndex((item) => item.id === game.current_question);
@@ -607,8 +606,8 @@ export function createQuizEngine(options = {}) {
       }
       if (game.question_phase === 'closed') {
         const closedAt = Date.parse(game.question_closed_at);
-        if (Number.isNaN(closedAt) || nowMs() < closedAt + REVEAL_MS + ANSWER_MS) {
-          throwApp('REVEAL_IN_PROGRESS', 'На экране ещё отсчёт и ответ');
+        if (Number.isNaN(closedAt) || nowMs() < closedAt + REVEAL_MS) {
+          throwApp('REVEAL_IN_PROGRESS', 'На экране ещё показ ответа');
         }
       }
       game.status = 'finished';

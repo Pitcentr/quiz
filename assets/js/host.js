@@ -188,7 +188,7 @@
   function confirmFinishQuestion() {
     confirmDialog({
       title: 'Завершить вопрос?',
-      text: 'Приём ответов остановится. Кто не ответил, получит 0. Дальше экран сам покажет отсчёт, ответ и сразу следующий вопрос. Баллы обновятся в рейтинге справа.',
+      text: 'Приём ответов остановится. Кто не ответил, получит 0. На экране появится, кто что выбрал: правильный вариант мигнёт пять секунд, затем откроется следующий вопрос.',
       confirmText: 'Завершить',
       danger: true
     }).then(function (ok) { if (ok) run('finishQuestion'); });
@@ -265,8 +265,6 @@
   }
 
   function holdLabel(data) {
-    var countLeft = countdownRemaining(data.question_closed_at);
-    if (countLeft > 0) return 'Отсчёт на экране · ' + Math.ceil(countLeft / 1000);
     var left = revealRemaining(data.question_closed_at);
     if (left > 0) return 'Ответ на экране · ' + Math.ceil(left / 1000);
     return data.is_last_question ? 'Завершить игру' : 'Далее';
