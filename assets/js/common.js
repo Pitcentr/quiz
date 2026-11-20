@@ -730,61 +730,95 @@ var closingQuestionId = '';
 
 var WAIT_TRACKS = ['assets/audio/wait.mp3', 'assets/audio/wait.m4a', 'assets/audio/wait.ogg', 'assets/audio/wait.wav'];
 
-function startWaitBed() {
-  if (waitBed) return;
+function ensureWaitBed() {
+  if (waitBed) return waitBed;
   var audio = new Audio();
-  var bed = { audio: audio, alive: true, index: 0 };
+  var bed = { audio: audio, alive: true, index: 0, want: false, fade: null };
   waitBed = bed;
   audio.loop = true;
   audio.volume = 0.55;
   audio.preload = 'auto';
+  audio.addEventListener('playing', function () { bed.started = true; });
   audio.addEventListener('error', function () {
-    if (!bed.alive || waitBed !== bed) return;
+    if (!bed.alive || waitBed !== bed || bed.started || bed.blob) return;
     bed.index += 1;
-    if (bed.index >= WAIT_TRACKS.length) {
-      bed.alive = false;
-      waitBed = null;
-      return;
-    }
-    audio.src = new URL(WAIT_TRACKS[bed.index], window.location.href).href;
-    audio.load();
+    if (bed.index >= WAIT_TRACKS.length) return;
+    loadWaitSource(bed);
   });
-  audio.addEventListener('playing', function () {
-    bed.started = true;
+  audio.addEventListener('canplaythrough', function () {
+    bed.ready = true;
+    if (bed.want) playWaitBed();
   });
-  function play() {
+  bed.play = playWaitBed;
+  loadWaitSource(bed);
+  return bed;
+}
+
+function loadWaitSource(bed) {
+  var address = new URL(WAIT_TRACKS[bed.index], window.location.href).href;
+  fetch(address).then(function (response) {
+    if (!response.ok) throw new Error('missing');
+    return response.blob();
+  }).then(function (blob) {
     if (!bed.alive || waitBed !== bed) return;
-    var pending = audio.play();
-    if (pending && pending.catch) pending.catch(function () {});
+    if (bed.blobUrl) URL.revokeObjectURL(bed.blobUrl);
+    var type = blob.type || (WAIT_TRACKS[bed.index].slice(-4) === '.wav' ? 'audio/wav' : 'audio/mpeg');
+    var file = blob.type ? blob : new Blob([blob], { type: type });
+    bed.blob = true;
+    bed.blobUrl = URL.createObjectURL(file);
+    bed.audio.src = bed.blobUrl;
+  }).catch(function () {
+    if (!bed.alive || waitBed !== bed || bed.started) return;
+    bed.audio.src = address;
+  });
+}
+
+function playWaitBed() {
+  var bed = waitBed;
+  if (!bed || !bed.alive || !bed.want) return;
+  if (bed.fade) {
+    clearInterval(bed.fade);
+    bed.fade = null;
   }
-  audio.addEventListener('canplay', play);
-  bed.play = play;
-  audio.src = new URL(WAIT_TRACKS[0], window.location.href).href;
-  audio.load();
+  bed.audio.volume = 0.55;
+  var pending = bed.audio.play();
+  if (pending && pending.catch) pending.catch(function () {});
+}
+
+function startWaitBed() {
+  var bed = ensureWaitBed();
+  bed.want = true;
+  playWaitBed();
+}
+
+function preloadWaitBed() {
+  ensureWaitBed();
 }
 
 function stopWaitBed(immediate) {
   if (!waitBed) return;
   var bed = waitBed;
-  waitBed = null;
-  bed.alive = false;
-  if (bed.timer) clearInterval(bed.timer);
-  if (!bed.audio) return;
   var audio = bed.audio;
+  bed.want = false;
+  if (bed.fade) clearInterval(bed.fade);
+  if (!audio) return;
   if (immediate) {
+    bed.fade = null;
     audio.pause();
-    audio.removeAttribute('src');
-    try { audio.load(); } catch (error) {}
     return;
   }
-  var fade = setInterval(function () {
+  bed.fade = setInterval(function () {
+    if (bed.want) {
+      clearInterval(bed.fade);
+      bed.fade = null;
+      return;
+    }
     var next = Math.max(0, audio.volume - 0.1);
     audio.volume = next;
     if (next > 0) return;
-    clearInterval(fade);
+    clearInterval(bed.fade);
+    bed.fade = null;
     audio.pause();
-    audio.removeAttribute('src');
-    try { audio.load(); } catch (error) {}
   }, 40);
 }
 

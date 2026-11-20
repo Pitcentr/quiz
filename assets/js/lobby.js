@@ -650,6 +650,8 @@
     }
   }
 
+  preloadWaitBed();
+
   if (session && session.room_code) {
     app.appendChild(h('div', { class: 'shell' }, [
       topbar(),
