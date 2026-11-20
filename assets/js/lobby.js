@@ -22,7 +22,6 @@
 
   function setScreen(node) {
     stopReveal();
-    stopWaitBed();
     clearConfetti();
     clearNode(app);
     app.appendChild(node);
@@ -465,7 +464,6 @@
     revealedFaces = signature;
     if (first) {
       revealMode = '';
-      stopWaitBed(true);
       var orb = document.getElementById('reveal-count');
       if (orb) delete orb.dataset.ready;
       stopReveal();
@@ -650,7 +648,7 @@
     }
   }
 
-  preloadWaitBed();
+  startWaitBed();
 
   if (session && session.room_code) {
     app.appendChild(h('div', { class: 'shell' }, [

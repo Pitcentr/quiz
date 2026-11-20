@@ -736,7 +736,7 @@ function ensureWaitBed() {
   var bed = { audio: audio, alive: true, index: 0, want: false, fade: null };
   waitBed = bed;
   audio.loop = true;
-  audio.volume = 0.55;
+  audio.volume = 0.38;
   audio.preload = 'auto';
   audio.addEventListener('playing', function () { bed.started = true; });
   audio.addEventListener('error', function () {
@@ -780,7 +780,7 @@ function playWaitBed() {
     clearInterval(bed.fade);
     bed.fade = null;
   }
-  bed.audio.volume = 0.55;
+  bed.audio.volume = 0.38;
   var pending = bed.audio.play();
   if (pending && pending.catch) pending.catch(function () {});
 }
