@@ -728,7 +728,7 @@ function playCoin() {
 var waitBed = null;
 var closingQuestionId = '';
 
-var WAIT_TRACKS = ['assets/audio/wait.mp3', 'assets/audio/wait.m4a', 'assets/audio/wait.ogg', 'assets/audio/wait.wav'];
+var WAIT_TRACKS = ['assets/audio/wait.m4a', 'assets/audio/wait.mp3', 'assets/audio/wait.ogg', 'assets/audio/wait.wav'];
 
 function ensureWaitBed() {
   if (waitBed) return waitBed;
@@ -745,7 +745,7 @@ function ensureWaitBed() {
     if (bed.index >= WAIT_TRACKS.length) return;
     audio.src = new URL(WAIT_TRACKS[bed.index], window.location.href).href;
   });
-  audio.addEventListener('canplay', function () {
+  audio.addEventListener('canplaythrough', function () {
     bed.ready = true;
     if (bed.want) playWaitBed();
   });
