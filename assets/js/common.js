@@ -736,41 +736,22 @@ function ensureWaitBed() {
   var bed = { audio: audio, alive: true, index: 0, want: false, fade: null };
   waitBed = bed;
   audio.loop = true;
-  audio.volume = 0.38;
+  audio.volume = 0.19;
   audio.preload = 'auto';
   audio.addEventListener('playing', function () { bed.started = true; });
   audio.addEventListener('error', function () {
-    if (!bed.alive || waitBed !== bed || bed.started || bed.blob) return;
+    if (!bed.alive || waitBed !== bed || bed.started) return;
     bed.index += 1;
     if (bed.index >= WAIT_TRACKS.length) return;
-    loadWaitSource(bed);
+    audio.src = new URL(WAIT_TRACKS[bed.index], window.location.href).href;
   });
-  audio.addEventListener('canplaythrough', function () {
+  audio.addEventListener('canplay', function () {
     bed.ready = true;
     if (bed.want) playWaitBed();
   });
   bed.play = playWaitBed;
-  loadWaitSource(bed);
+  audio.src = new URL(WAIT_TRACKS[0], window.location.href).href;
   return bed;
-}
-
-function loadWaitSource(bed) {
-  var address = new URL(WAIT_TRACKS[bed.index], window.location.href).href;
-  fetch(address).then(function (response) {
-    if (!response.ok) throw new Error('missing');
-    return response.blob();
-  }).then(function (blob) {
-    if (!bed.alive || waitBed !== bed) return;
-    if (bed.blobUrl) URL.revokeObjectURL(bed.blobUrl);
-    var type = blob.type || (WAIT_TRACKS[bed.index].slice(-4) === '.wav' ? 'audio/wav' : 'audio/mpeg');
-    var file = blob.type ? blob : new Blob([blob], { type: type });
-    bed.blob = true;
-    bed.blobUrl = URL.createObjectURL(file);
-    bed.audio.src = bed.blobUrl;
-  }).catch(function () {
-    if (!bed.alive || waitBed !== bed || bed.started) return;
-    bed.audio.src = address;
-  });
 }
 
 function playWaitBed() {
@@ -780,7 +761,7 @@ function playWaitBed() {
     clearInterval(bed.fade);
     bed.fade = null;
   }
-  bed.audio.volume = 0.38;
+  bed.audio.volume = 0.19;
   var pending = bed.audio.play();
   if (pending && pending.catch) pending.catch(function () {});
 }
