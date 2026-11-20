@@ -374,16 +374,19 @@ h2 { font-size: 28px; margin-bottom: 8px; }
   overflow: hidden;
 }
 .options.picks .opt:disabled { opacity: 1; }
-.opt.has-faces { flex-wrap: wrap; }
+.opt-line { display: flex; align-items: center; gap: 12px; min-width: 0; flex: 1 1 auto; }
+.opt.has-faces { flex-direction: column; align-items: stretch; justify-content: center; }
+.opt.has-faces .opt-line { width: 100%; flex: 0 0 auto; }
 .opt .faces {
-  flex: 1 0 100%;
+  flex: 0 0 auto;
   display: flex;
   flex-wrap: wrap;
   align-content: flex-start;
   gap: 6px;
-  min-height: 0;
+  width: 100%;
+  min-height: 30px;
   margin-top: 8px;
-  overflow: auto;
+  overflow: visible;
 }
 .face {
   display: inline-flex;
@@ -771,8 +774,14 @@ input {
     gap: 8px;
   }
   .page-tv .stage-live .opt .key { width: 26px; height: 26px; border-radius: 8px; font-size: 13px; }
-  .page-tv .stage-live .opt.has-faces { padding: 4px 8px; gap: 4px; }
-  .page-tv .stage-live .faces { margin-top: 2px; gap: 3px; }
+  .page-tv .stage-live .opt.has-faces {
+    flex: 1 1 auto;
+    min-height: 58px;
+    overflow: visible;
+    padding: 4px 8px;
+    gap: 4px;
+  }
+  .page-tv .stage-live .faces { margin-top: 2px; gap: 3px; min-height: 22px; }
   .page-tv .stage-live .face { gap: 3px; padding: 0 5px 0 0; }
   .page-tv .stage-live .face-name { font-size: 11px; max-width: 8ch; }
   .page-tv .stage-live .face .avatar { width: 18px; height: 18px; }

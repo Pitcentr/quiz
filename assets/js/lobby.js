@@ -8,6 +8,7 @@
   var heardQuestion = '';
   var heardAnswers = 0;
   var revealedQuestion = '';
+  var revealedFaces = '';
   var advanceState = { timer: null, key: '' };
   var closedBoard = null;
 
@@ -359,12 +360,21 @@
     return rows;
   }
 
+  function choiceSignature(data) {
+    return (data.players || []).map(function (player) {
+      return (player.player_id || player.name) + '=' + String(player.answer || '').toUpperCase();
+    }).join('|');
+  }
+
   function beginReveal(data) {
     var question = data.question;
     if (!question || !question.id) return;
-    if (revealedQuestion === question.id) return;
+    var signature = choiceSignature(data);
+    var first = revealedQuestion !== question.id;
+    if (!first && revealedFaces === signature) return;
     revealedQuestion = question.id;
-    stopWaitBed();
+    revealedFaces = signature;
+    if (first) stopWaitBed(true);
     var options = document.getElementById('options');
     if (options && question.answers) {
       paintOptions(options, question, {
@@ -380,8 +390,9 @@
     if (dock) dock.classList.add('is-on');
     var orb = document.getElementById('reveal-count');
     var count = beatNumber(revealRemaining(data.question_closed_at));
-    if (orb) orb.textContent = String(count);
+    if (orb && first) orb.textContent = String(count);
     showAnswered(data);
+    if (!first) return;
     playGong();
     stopReveal();
     var last = count;
@@ -504,7 +515,8 @@
   function facesByLetter(data) {
     var groups = { A: [], B: [], C: [], D: [] };
     (data.players || []).forEach(function (player) {
-      if (groups[player.answer]) groups[player.answer].push(player);
+      var letter = String(player.answer || '').toUpperCase();
+      if (groups[letter]) groups[letter].push(player);
     });
     return groups;
   }

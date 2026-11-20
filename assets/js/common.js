@@ -433,10 +433,11 @@ function paintOptions(container, question, options) {
     if (options.blink && options.correct === letter) className += ' blink';
     if (options.correct && options.selected === letter && options.selected !== options.correct) className += ' bad';
     if (people && people.length) className += ' has-faces';
-    var children = [
+    var line = h('span', { class: 'opt-line' }, [
       h('span', { class: 'key', text: letter }),
       h('span', { class: 'label', text: question.answers[letter] || '' })
-    ];
+    ]);
+    var children = [line];
     if (people && people.length) {
       children.push(h('span', { class: 'faces' }, people.map(function (player, index) {
         var face = h('span', { class: 'face', title: player.name }, [
@@ -597,7 +598,41 @@ function playAnswerShow() {
   });
 }
 
+var GONG_TRACKS = ['assets/audio/gong.mp3', 'assets/audio/gong.wav', 'assets/audio/gong.m4a', 'assets/audio/gong.ogg'];
+
 function playGong() {
+  var audio = new Audio();
+  var index = 0;
+  var started = false;
+  function tone() {
+    if (started) return;
+    started = true;
+    playGongTone();
+  }
+  audio.preload = 'auto';
+  audio.volume = 1;
+  audio.addEventListener('error', function () {
+    if (started) return;
+    index += 1;
+    if (index >= GONG_TRACKS.length) {
+      tone();
+      return;
+    }
+    audio.src = new URL(GONG_TRACKS[index], window.location.href).href;
+  });
+  audio.addEventListener('playing', function () { started = true; });
+  function start() {
+    var pending = audio.play();
+    if (pending && pending.catch) pending.catch(tone);
+  }
+  audio.addEventListener('canplay', function onReady() {
+    audio.removeEventListener('canplay', onReady);
+    start();
+  });
+  audio.src = new URL(GONG_TRACKS[0], window.location.href).href;
+}
+
+function playGongTone() {
   var ctx = audioContext();
   if (!ctx) return;
   var now = ctx.currentTime;
@@ -695,7 +730,7 @@ function startWaitBed() {
   audio.load();
 }
 
-function stopWaitBed() {
+function stopWaitBed(immediate) {
   if (!waitBed) return;
   var bed = waitBed;
   waitBed = null;
@@ -703,6 +738,12 @@ function stopWaitBed() {
   if (bed.timer) clearInterval(bed.timer);
   if (!bed.audio) return;
   var audio = bed.audio;
+  if (immediate) {
+    audio.pause();
+    audio.removeAttribute('src');
+    try { audio.load(); } catch (error) {}
+    return;
+  }
   var fade = setInterval(function () {
     var next = Math.max(0, audio.volume - 0.1);
     audio.volume = next;
