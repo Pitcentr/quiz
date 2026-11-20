@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
 
 const VERSION = '1.0.0';
 const MAX_PLAYERS = 20;
-const REVEAL_MS = 5000;
+const REVEAL_MS = 12000;
 const MIN_NAME = 2;
 const MAX_NAME = 20;
 

@@ -240,12 +240,12 @@ async function main() {
     if (number === 1) {
       const tooSoon = await engine.handle('nextQuestion', { host_token: hostToken, room_code: room });
       check(tooSoon.error && tooSoon.error.code === 'REVEAL_IN_PROGRESS', 'next question waits for the reveal');
-      now += 4999;
+      now += 11999;
       const stillUp = await engine.handle('nextQuestion', { host_token: hostToken, room_code: room });
       check(stillUp.error && stillUp.error.code === 'REVEAL_IN_PROGRESS', 'choices stay on screen until the countdown ends');
       now += 1;
     } else {
-      now += 5000;
+      now += 12000;
     }
     if (number === 1) {
       const shown = await engine.handle('showResults', { host_token: hostToken, room_code: room });

@@ -3,7 +3,7 @@ var CONFIG = {
   // Оставьте пустым, если скрипт привязан к таблице или ID уже сохранён при первой настройке.
   SPREADSHEET_ID: '',
   MAX_PLAYERS: 20,
-  REVEAL_MS: 5000,
+  REVEAL_MS: 12000,
   ARCHIVE_AFTER_DAYS: 7,
   CACHE_TTL: 21600,
   QUESTION_CACHE_TTL: 30

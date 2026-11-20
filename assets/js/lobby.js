@@ -9,6 +9,7 @@
   var heardAnswers = 0;
   var revealedQuestion = '';
   var revealedFaces = '';
+  var revealMode = '';
   var advanceState = { timer: null, key: '' };
   var closedBoard = null;
 
@@ -400,48 +401,80 @@
     }).join('|');
   }
 
+  function paintFaces(data, blink) {
+    var question = data.question;
+    var options = document.getElementById('options');
+    if (!options || !question || !question.answers) return;
+    paintOptions(options, question, {
+      interactive: false,
+      correct: blink ? question.correct_answer : null,
+      blink: !!blink,
+      faces: facesByLetter(data)
+    });
+  }
+
+  function setBlink(on, letter) {
+    Array.prototype.forEach.call(document.querySelectorAll('#options .opt'), function (button) {
+      var match = !!on && button.getAttribute('data-letter') === letter;
+      button.classList.toggle('blink', match);
+      button.classList.toggle('right', match);
+    });
+  }
+
+  function syncReveal(data, forcePaint) {
+    var question = data.question;
+    if (!question) return;
+    var phase = revealPhase(data.question_closed_at);
+    var showBlink = phase === 'blink' || phase === 'done';
+    var showCount = phase !== 'picks';
+    if (forcePaint) paintFaces(data, showBlink);
+    else if (phase !== revealMode) setBlink(showBlink, question.correct_answer);
+    var label = document.getElementById('answered-label');
+    if (label) label.hidden = true;
+    var dock = document.getElementById('count-dock');
+    if (dock) dock.classList.toggle('is-on', showCount);
+    if (showCount) {
+      var num = phase === 'countdown' ? countdownNumber(data.question_closed_at) : 0;
+      var orb = document.getElementById('reveal-count');
+      if (orb && orb.textContent !== String(num)) {
+        var known = orb.dataset.ready === '1';
+        orb.textContent = String(num);
+        orb.classList.remove('pop');
+        void orb.offsetWidth;
+        orb.classList.add('pop');
+        if (phase === 'countdown' && known) playTick(num);
+      }
+      if (orb && phase === 'countdown') orb.dataset.ready = '1';
+    }
+    if ((revealMode === '' || revealMode === 'picks') && phase === 'countdown') playGong();
+    revealMode = phase;
+    showAnswered(data);
+  }
+
   function beginReveal(data) {
     var question = data.question;
     if (!question || !question.id) return;
     var signature = choiceSignature(data);
     var first = revealedQuestion !== question.id;
-    if (!first && revealedFaces === signature) return;
+    var facesChanged = first || revealedFaces !== signature;
+    if (!facesChanged && revealClock) {
+      syncReveal(data, false);
+      return;
+    }
     revealedQuestion = question.id;
     revealedFaces = signature;
-    if (first) stopWaitBed(true);
-    var options = document.getElementById('options');
-    if (options && question.answers) {
-      paintOptions(options, question, {
-        interactive: false,
-        correct: question.correct_answer,
-        blink: true,
-        faces: facesByLetter(data)
-      });
+    if (first) {
+      revealMode = '';
+      stopWaitBed(true);
+      var orb = document.getElementById('reveal-count');
+      if (orb) delete orb.dataset.ready;
+      stopReveal();
+      revealClock = setInterval(function () {
+        if (!snapshot || !snapshot.question || snapshot.question.id !== question.id) return;
+        syncReveal(snapshot, false);
+      }, 80);
     }
-    var label = document.getElementById('answered-label');
-    if (label) label.hidden = true;
-    var dock = document.getElementById('count-dock');
-    if (dock) dock.classList.add('is-on');
-    var orb = document.getElementById('reveal-count');
-    var count = beatNumber(revealRemaining(data.question_closed_at));
-    if (orb && first) orb.textContent = String(count);
-    showAnswered(data);
-    if (!first) return;
-    playGong();
-    stopReveal();
-    var last = count;
-    revealClock = setInterval(function () {
-      if (!snapshot || !snapshot.question || snapshot.question.id !== question.id) return;
-      var num = beatNumber(revealRemaining(snapshot.question_closed_at));
-      var node = document.getElementById('reveal-count');
-      if (!node || num === last) return;
-      last = num;
-      node.textContent = String(num);
-      node.classList.remove('pop');
-      void node.offsetWidth;
-      node.classList.add('pop');
-      playTick(num);
-    }, 80);
+    syncReveal(data, true);
   }
 
   function rememberClosedBoard(data) {
@@ -526,10 +559,6 @@
     heardAnswers = count;
     var burst = Math.min(added, 4);
     for (var i = 0; i < burst; i += 1) setTimeout(playAnswerLock, i * 110);
-  }
-
-  function beatNumber(left) {
-    return Math.max(1, Math.min(5, Math.ceil(left / 1000)));
   }
 
   function showAnswered(data) {

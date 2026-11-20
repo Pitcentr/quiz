@@ -484,7 +484,11 @@ function clearConfetti() {
 
 var serverClockOffset = 0;
 var audioCtx = null;
-var REVEAL_MS = 5000;
+var PICKS_MS = 1000;
+var COUNTDOWN_MS = 6000;
+var BLINK_MS = 5000;
+var REVEAL_MS = PICKS_MS + COUNTDOWN_MS + BLINK_MS;
+var revealAnchor = 0;
 
 function noteServerTime(isoTime) {
   var parsed = Date.parse(isoTime || '');
@@ -501,8 +505,35 @@ function elapsedSince(closedAt) {
   return serverNow() - closed;
 }
 
+function noteRevealStart() {
+  if (!revealAnchor) revealAnchor = Date.now();
+}
+
+function clearRevealStart() {
+  revealAnchor = 0;
+}
+
+function revealElapsed(closedAt) {
+  if (revealAnchor) return Date.now() - revealAnchor;
+  return elapsedSince(closedAt);
+}
+
 function revealRemaining(closedAt) {
-  return Math.max(0, REVEAL_MS - elapsedSince(closedAt));
+  return Math.max(0, REVEAL_MS - revealElapsed(closedAt));
+}
+
+function revealPhase(closedAt) {
+  var elapsed = revealElapsed(closedAt);
+  if (elapsed < PICKS_MS) return 'picks';
+  if (elapsed < PICKS_MS + COUNTDOWN_MS) return 'countdown';
+  if (elapsed < REVEAL_MS) return 'blink';
+  return 'done';
+}
+
+function countdownNumber(closedAt) {
+  var into = revealElapsed(closedAt) - PICKS_MS;
+  if (into < 0) return 5;
+  return Math.max(0, 5 - Math.floor(into / 1000));
 }
 
 function clearAutoAdvance(state) {
@@ -516,8 +547,10 @@ function armAutoAdvance(state, data, credentials, onDone) {
   if (!state || !credentials || !credentials.host_token || !data) return;
   if (data.status !== 'active' || (data.question_phase !== 'closed' && data.question_phase !== 'results')) {
     clearAutoAdvance(state);
+    clearRevealStart();
     return;
   }
+  if (data.question_phase === 'closed') noteRevealStart();
   var qid = data.question && data.question.id ? data.question.id : '';
   var key = qid + ':' + data.question_phase;
   if (state.key === key && state.timer) return;
@@ -576,7 +609,7 @@ function playTone(freq, duration, type, volume) {
 }
 
 function playTick(beat) {
-  var last = beat === 1;
+  var last = beat === 0;
   playTone(last ? 523 : 880, last ? 0.16 : 0.1, 'sine', 0.14);
   playTone(last ? 784 : 1320, last ? 0.22 : 0.08, 'triangle', 0.07);
 }
