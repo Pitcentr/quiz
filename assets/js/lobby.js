@@ -99,9 +99,43 @@
     stopPoll = pollEvery(QUIZ_CONFIG.POLL_SCREEN_MS, refresh);
   }
 
+  function choicesMissing(data) {
+    var phase = data && data.question_phase;
+    if (phase !== 'closed' && phase !== 'results') return false;
+    return (data.players || []).some(function (player) {
+      return player.answered && !player.answer;
+    });
+  }
+
+  function mergeChoices(data, hostData) {
+    var byId = {};
+    (hostData.players || []).forEach(function (player) { byId[player.player_id] = player; });
+    (data.players || []).forEach(function (player) {
+      var hostPlayer = byId[player.player_id];
+      if (!hostPlayer || !hostPlayer.answer) return;
+      player.answer = String(hostPlayer.answer).toUpperCase();
+    });
+    if (data.question && hostData.question && hostData.question.correct_answer && !data.question.correct_answer) {
+      data.question.correct_answer = hostData.question.correct_answer;
+    }
+  }
+
+  function withChoices(data) {
+    if (!session || !session.host_token || !choicesMissing(data)) return Promise.resolve(data);
+    return apiRequest('getGame', {
+      room_code: session.room_code,
+      host_token: session.host_token
+    }).then(function (hostData) {
+      mergeChoices(data, hostData);
+      return data;
+    }, function () {
+      return data;
+    });
+  }
+
   function refresh() {
     if (!session) return Promise.resolve();
-    return apiRequest('getGame', { room_code: session.room_code }).then(function (data) {
+    return apiRequest('getGame', { room_code: session.room_code }).then(withChoices).then(function (data) {
       noteServerTime(data.server_time);
       snapshot = data;
       setConnection(true);

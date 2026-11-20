@@ -774,9 +774,11 @@ input {
     gap: 8px;
   }
   .page-tv .stage-live .opt .key { width: 26px; height: 26px; border-radius: 8px; font-size: 13px; }
+  .page-tv .stage-live .options.stack { overflow: auto; }
   .page-tv .stage-live .opt.has-faces {
-    flex: 1 1 auto;
-    min-height: 58px;
+    flex: 0 0 auto;
+    height: auto;
+    min-height: 64px;
     overflow: visible;
     padding: 4px 8px;
     gap: 4px;
