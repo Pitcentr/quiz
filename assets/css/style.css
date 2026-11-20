@@ -422,13 +422,10 @@ h2 { font-size: 28px; margin-bottom: 8px; }
   margin-bottom: 12px;
 }
 .pick-board .avatar { width: 40px; height: 40px; }
-.count-dock {
-  display: flex;
-  justify-content: center;
-  flex: 0 0 auto;
-  margin-top: auto;
-  padding-top: 4px;
-}
+.stage-question .count-dock { display: none; justify-content: center; flex: 0 0 auto; margin-top: 8px; }
+.stage-question .count-dock.is-on { display: flex; }
+.stage-live .opt.has-faces { align-items: flex-start; align-content: flex-start; }
+.stage-question .count-orb { width: 72px; height: 72px; font-size: 36px; }
 .count-orb {
   width: 92px;
   height: 92px;
@@ -774,6 +771,13 @@ input {
     gap: 8px;
   }
   .page-tv .stage-live .opt .key { width: 26px; height: 26px; border-radius: 8px; font-size: 13px; }
+  .page-tv .stage-live .opt.has-faces { padding: 4px 8px; gap: 4px; }
+  .page-tv .stage-live .faces { margin-top: 2px; gap: 3px; }
+  .page-tv .stage-live .face { gap: 3px; padding: 0 5px 0 0; }
+  .page-tv .stage-live .face-name { font-size: 11px; max-width: 8ch; }
+  .page-tv .stage-live .face .avatar { width: 18px; height: 18px; }
+  .page-tv .stage-question .count-orb { width: 40px; height: 40px; font-size: 20px; }
+  .page-tv .stage-question .count-dock { margin-top: 4px; }
   .page-tv .stage-question .muted { margin: 4px 0 0; font-size: 12px; }
   .page-tv .stage-rail h2 { font-size: 18px; }
   .page-tv .stage-rail .lb {

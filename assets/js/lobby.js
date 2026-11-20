@@ -7,6 +7,7 @@
   var creating = false;
   var heardQuestion = '';
   var heardAnswers = 0;
+  var revealedQuestion = '';
   var advanceState = { timer: null, key: '' };
   var closedBoard = null;
 
@@ -133,8 +134,7 @@
     if (!data) return 'create';
     if (data.status === 'finished') return 'final';
     if (data.status === 'waiting') return 'lobby';
-    if (data.question_phase === 'open') return 'question';
-    if (data.question_phase === 'closed' || data.question_phase === 'results') return 'picks';
+    if (data.status === 'active' && data.question) return 'question';
     return 'lobby';
   }
 
@@ -152,7 +152,6 @@
     app.dataset.key = key;
     if (view === 'lobby') mountLobby(data);
     else if (view === 'question') mountQuestion(data);
-    else if (view === 'picks') mountPicks(data);
     else if (view === 'final') mountFinal(data);
   }
 
@@ -300,7 +299,16 @@
           h('p', { class: 'eyebrow', text: question.points + ' ' + plural(question.points, 'балл', 'балла', 'баллов') }),
           h('h1', { class: 'q-text ' + questionSizeClass(question.question), text: question.question }),
           options,
-          h('p', { class: 'muted', id: 'answered-label', text: answeredText(data) })
+          h('p', { class: 'muted', id: 'answered-label', text: answeredText(data) }),
+          h('div', { class: 'count-dock', id: 'count-dock' }, [
+            h('div', {
+              class: 'count-orb',
+              id: 'reveal-count',
+              role: 'timer',
+              'aria-label': 'До следующего вопроса',
+              text: '5'
+            })
+          ])
         ]),
         h('aside', { class: 'card stage-rail' }, [
           h('h2', { text: 'Рейтинг' }),
@@ -308,16 +316,87 @@
         ])
       ])
     ]));
+    var closed = data.question_phase === 'closed' || data.question_phase === 'results';
+    var award = closed ? null : awardRowsFor(data);
     paintOptions(options, question, { interactive: false });
-    var award = awardRowsFor(data);
-    renderLeaderboard(board, award || ratedRows(data), {
+    renderLeaderboard(board, award || (closed ? frozenRows(data) : ratedRows(data)), {
       scoresOnly: true,
       showStatus: true,
       ceremony: !!award
     });
     if (award) releaseCeremony(board);
-    rememberAnswers(data, true);
-    startWaitBed();
+    if (closed) beginReveal(data);
+    else {
+      rememberAnswers(data, true);
+      startWaitBed();
+    }
+  }
+
+  function frozenRows(data) {
+    var rows = ratedRows(data).map(function (row) {
+      var gained = Number(row.last_points) || 0;
+      return {
+        player_id: row.player_id,
+        name: row.name,
+        place: row.place,
+        total_score: Math.max(0, Number(row.total_score) - gained),
+        last_points: 0,
+        answered: !!row.answered
+      };
+    });
+    rows.sort(function (a, b) {
+      return b.total_score - a.total_score || String(a.name).localeCompare(String(b.name), 'ru');
+    });
+    var place = 0;
+    var previous = null;
+    rows.forEach(function (row, index) {
+      if (previous === null || row.total_score !== previous) {
+        place = index + 1;
+        previous = row.total_score;
+      }
+      row.place = place;
+    });
+    return rows;
+  }
+
+  function beginReveal(data) {
+    var question = data.question;
+    if (!question || !question.id) return;
+    if (revealedQuestion === question.id) return;
+    revealedQuestion = question.id;
+    stopWaitBed();
+    var options = document.getElementById('options');
+    if (options && question.answers) {
+      paintOptions(options, question, {
+        interactive: false,
+        correct: question.correct_answer,
+        blink: true,
+        faces: facesByLetter(data)
+      });
+    }
+    var label = document.getElementById('answered-label');
+    if (label) label.hidden = true;
+    var dock = document.getElementById('count-dock');
+    if (dock) dock.classList.add('is-on');
+    var orb = document.getElementById('reveal-count');
+    var count = beatNumber(revealRemaining(data.question_closed_at));
+    if (orb) orb.textContent = String(count);
+    showAnswered(data);
+    playGong();
+    stopReveal();
+    var last = count;
+    revealClock = setInterval(function () {
+      if (!snapshot || !snapshot.question || snapshot.question.id !== question.id) return;
+      var num = beatNumber(revealRemaining(snapshot.question_closed_at));
+      var node = document.getElementById('reveal-count');
+      if (!node || num === last) return;
+      last = num;
+      node.textContent = String(num);
+      node.classList.remove('pop');
+      void node.offsetWidth;
+      node.classList.add('pop');
+      playTick(num);
+    }, 80);
   }
 
   function rememberClosedBoard(data) {
@@ -408,59 +487,26 @@
     return Math.max(1, Math.min(5, Math.ceil(left / 1000)));
   }
 
+  function showAnswered(data) {
+    var answered = {};
+    (data.players || []).forEach(function (player) {
+      if (player.answered) answered[player.player_id] = true;
+    });
+    Array.prototype.forEach.call(document.querySelectorAll('#side-board .lb-row'), function (row) {
+      var status = row.querySelector('.lb-status');
+      if (!status) return;
+      var done = !!answered[row.dataset.id];
+      status.textContent = done ? 'ответил' : 'ждём';
+      status.className = 'lb-status ' + (done ? 'ok' : 'wait');
+    });
+  }
+
   function facesByLetter(data) {
     var groups = { A: [], B: [], C: [], D: [] };
     (data.players || []).forEach(function (player) {
       if (groups[player.answer]) groups[player.answer].push(player);
     });
     return groups;
-  }
-
-  function mountPicks(data) {
-    var question = data.question || {};
-    document.title = 'КВИЗ · кто что выбрал';
-    var options = h('div', { class: 'options picks', id: 'options' });
-    var count = beatNumber(revealRemaining(data.question_closed_at));
-    setScreen(h('div', { class: 'shell' }, [
-      topbar(screenBar('Вопрос ' + (question.number || '') + ' из ' + (question.total || ''))),
-      h('section', { class: 'pick-board' }, [
-        h('div', { class: 'card pick-question' }, [
-          h('h1', { class: 'q-text ' + questionSizeClass(question.question), text: question.question || '' }),
-          options
-        ]),
-        h('div', { class: 'count-dock' }, [
-          h('div', {
-            class: 'count-orb pop',
-            id: 'reveal-count',
-            role: 'timer',
-            'aria-label': 'До следующего вопроса',
-            text: String(count)
-          })
-        ])
-      ])
-    ]));
-    if (question.answers) {
-      paintOptions(options, question, {
-        interactive: false,
-        correct: question.correct_answer,
-        blink: true,
-        faces: facesByLetter(data)
-      });
-    }
-    playGong();
-    var last = count;
-    revealClock = setInterval(function () {
-      if (!snapshot) return;
-      var num = beatNumber(revealRemaining(snapshot.question_closed_at));
-      var node = document.getElementById('reveal-count');
-      if (!node || num === last) return;
-      last = num;
-      node.textContent = String(num);
-      node.classList.remove('pop');
-      void node.offsetWidth;
-      node.classList.add('pop');
-      playTick(num);
-    }, 80);
   }
 
   function mountFinal(data) {
@@ -513,6 +559,10 @@
       var grid = document.getElementById('player-grid');
       if (grid) syncPlayers(grid, data.players || []);
     } else if (view === 'question') {
+      if (data.question_phase === 'closed' || data.question_phase === 'results') {
+        beginReveal(data);
+        return;
+      }
       var label = document.getElementById('answered-label');
       if (label) label.textContent = answeredText(data);
       var side = document.getElementById('side-board');
