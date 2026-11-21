@@ -832,7 +832,7 @@ input {
 
   .page-tv .lobby {
     display: grid;
-    grid-template-columns: minmax(0, 1.45fr) minmax(220px, 0.7fr);
+    grid-template-columns: minmax(0, 1.2fr) minmax(210px, 0.7fr);
     gap: 8px;
     align-items: stretch;
     height: 100%;
@@ -842,31 +842,45 @@ input {
     min-height: 0;
     height: 100%;
     overflow: hidden;
+  }
+  .page-tv .lobby-join {
     display: flex;
     flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    gap: 4px;
   }
-  .page-tv .qr-grid { flex: 1 1 auto; min-height: 0; align-items: stretch; }
-  .page-tv .qr-card { min-height: 0; display: flex; flex-direction: column; }
-  .page-tv .qr-box { flex: 1 1 auto; min-height: 0; }
-  .page-tv .room-code { font-size: 44px; margin: 0 0 4px; }
-  .page-tv .code-actions { margin-bottom: 4px; }
-  .page-tv .qr-grid { gap: 8px; margin-top: 6px; }
-  .page-tv .qr-card { padding: 6px; border-radius: 12px; }
-  .page-tv .qr-card h2 { font-size: 14px; }
-  .page-tv .qr-card p { font-size: 12px; }
-  .page-tv .qr-box { padding: 4px; margin-bottom: 4px; border-radius: 10px; }
-  .page-tv .qr-box img, .page-tv .qr-box canvas { width: min(168px, 100%); height: auto; }
-  .page-tv .join-fallback { padding: 6px 8px; margin: 2px 0 6px; gap: 2px; border-radius: 10px; }
-  .page-tv .lobby-main > .join-fallback > .muted { display: none; }
-  .page-tv .qr-card .host-fallback { padding: 4px 6px; margin: 4px 0 0; }
-  .page-tv .qr-card .host-fallback .fallback-title,
-  .page-tv .qr-card .host-fallback .join-link,
-  .page-tv .qr-card .host-fallback .muted { display: none; }
-  .page-tv .qr-card .host-fallback .btn { min-height: 26px; width: 100%; }
+  .page-tv .qr-hero,
+  .page-tv .room-block,
+  .page-tv .qr-host-copy { display: flex; flex-direction: column; align-items: center; }
+  .page-tv .qr-caption { margin: 2px 0 0; color: var(--muted); font-size: 12px; }
+  .page-tv .qr-box-player {
+    width: 176px;
+    height: 176px;
+    padding: 8px;
+    margin: 0;
+    flex: 0 0 auto;
+  }
+  .page-tv .qr-box-player img,
+  .page-tv .qr-box-player canvas { width: 160px; height: 160px; }
+  .page-tv .start-game { min-width: 200px; min-height: 40px; margin: 6px 0 2px; }
+  .page-tv .room-code { font-size: 40px; margin: 0; line-height: 1; }
+  .page-tv .room-block .join-fallback {
+    margin: 4px 0 0;
+    padding: 4px 8px;
+    gap: 2px;
+    align-items: center;
+  }
+  .page-tv .room-block .join-fallback .btn { display: none; }
+  .page-tv .lobby-main > .join-fallback > .muted,
+  .page-tv .room-block #question-count { display: none; }
+  .page-tv #skip-question { min-height: 32px; }
   .page-tv .join-link, .page-tv .join-link.host { font-size: 12px; }
   .page-tv .chip { padding: 4px 8px; font-size: 14px; gap: 6px; }
   .page-tv .avatar { width: 22px; height: 22px; }
-  .page-tv .players-panel { min-height: 0; }
+  .page-tv .players-panel { min-height: 0; display: flex; flex-direction: column; }
+  .page-tv .player-grid { flex: 1 1 auto; min-height: 0; overflow: auto; }
 
   .page-tv .pick-board { min-height: 0; gap: 6px; }
   .page-tv .pick-question { padding: 8px 10px; }

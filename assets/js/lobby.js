@@ -10,6 +10,7 @@
   var revealedQuestion = '';
   var revealedFaces = '';
   var revealMode = '';
+  var actionBusy = false;
   var advanceState = { timer: null, key: '' };
   var closedBoard = null;
 
@@ -196,22 +197,27 @@
     var screen = h('div', { class: 'shell' }, [
       topbar(screenBar(statusLabel(data.status), 'phase-pill')),
       h('section', { class: 'lobby' }, [
-        h('div', { class: 'card lobby-main' }, [
-          h('p', { class: 'eyebrow', text: 'Код комнаты' }),
-          h('div', { class: 'room-code', id: 'room-code', text: formatRoom(data.room_code) }),
-          h('div', { class: 'code-actions' }, [
-            h('button', { class: 'btn ghost', type: 'button', text: 'Скопировать код', onClick: function () { copyText(data.room_code); } })
+        h('div', { class: 'card lobby-main lobby-join' }, [
+          h('div', { class: 'qr-hero' }, [
+            h('p', { class: 'eyebrow', text: 'Игроки' }),
+            h('div', { class: 'qr-box qr-box-player', id: 'qr-player' }),
+            h('p', { class: 'qr-caption', text: 'Сканируйте, чтобы войти' })
           ]),
-          playerFallback(data.room_code),
-          h('p', { class: 'muted', id: 'question-count', text: questionCountText(data) }),
-          h('div', { class: 'qr-grid' }, [
-            qrCard('Игроки', 'Сканируйте, чтобы войти', 'qr-player'),
-            session.host_token
-              ? qrCard('Ведущий', 'Панель управления', 'qr-host', hostFallback(data.room_code, session.host_token))
-              : h('article', { class: 'qr-card' }, [
-                h('h2', { text: 'Ведущий' }),
-                h('p', { text: 'QR ведущего доступен на устройстве, где создали игру.' })
-              ])
+          session.host_token
+            ? h('button', {
+              class: 'btn primary start-game',
+              id: 'start-game',
+              type: 'button',
+              text: 'Начать',
+              disabled: !data.player_count,
+              onClick: startFromScreen
+            })
+            : null,
+          h('div', { class: 'room-block' }, [
+            h('p', { class: 'eyebrow', text: 'Код комнаты' }),
+            h('div', { class: 'room-code', id: 'room-code', text: formatRoom(data.room_code) }),
+            playerFallback(data.room_code),
+            h('p', { class: 'muted', id: 'question-count', text: questionCountText(data) })
           ])
         ]),
         h('aside', { class: 'card players-panel' }, [
@@ -225,21 +231,60 @@
     ]);
     setScreen(screen);
     mountQr(document.getElementById('qr-player'), playerLink(data.room_code), 360);
-    if (session.host_token) mountQr(document.getElementById('qr-host'), hostLink(data.room_code, session.host_token), 360, QRCode.CorrectLevel.L);
     syncPlayers(grid, data.players || []);
   }
 
-  function qrCard(title, caption, id, extra) {
-    return h('article', { class: 'qr-card' }, [
-      h('h2', { text: title }),
-      h('div', { class: 'qr-box', id: id }),
-      h('p', { text: caption }),
-      extra || null
-    ]);
+  function startFromScreen() {
+    if (!session || !session.host_token || actionBusy) return;
+    if (!snapshot || !snapshot.player_count) {
+      toast('Сначала пусть кто-нибудь войдёт');
+      return;
+    }
+    actionBusy = true;
+    var button = document.getElementById('start-game');
+    if (button) {
+      button.disabled = true;
+      button.textContent = 'Запускаем…';
+    }
+    apiRequest('startGame', {
+      host_token: session.host_token,
+      room_code: session.room_code
+    }).then(function () {
+      return refresh();
+    }).catch(function (error) {
+      toast(error.message || 'Не удалось начать игру');
+      if (button) {
+        button.disabled = false;
+        button.textContent = 'Начать';
+      }
+    }).then(function () {
+      actionBusy = false;
+    });
   }
 
-  function screenBar(pillText, pillId) {
+  function skipQuestion() {
+    if (!session || !session.host_token || actionBusy) return;
+    actionBusy = true;
+    var button = document.getElementById('skip-question');
+    if (button) button.disabled = true;
+    apiRequest('finishQuestion', {
+      host_token: session.host_token,
+      room_code: session.room_code
+    }).then(function () {
+      return refresh();
+    }).catch(function (error) {
+      if (error.code !== 'QUESTION_NOT_OPEN' && error.code !== 'GAME_NOT_ACTIVE') {
+        toast(error.message || 'Не удалось пропустить вопрос');
+      }
+      if (button) button.disabled = false;
+    }).then(function () {
+      actionBusy = false;
+    });
+  }
+
+  function screenBar(pillText, pillId, extra) {
     return h('div', { class: 'bar-actions' }, [
+      extra || null,
       pillText ? h('div', { class: 'pill', id: pillId || '', text: pillText }) : null,
       h('button', { class: 'btn ghost', type: 'button', text: 'Выйти', onClick: confirmLeave })
     ]);
@@ -269,21 +314,6 @@
       h('p', { class: 'fallback-title', text: 'Если QR не сработал' }),
       h('a', { class: 'join-link', href: playerLink(room), text: linkLabel(page) }),
       h('p', { class: 'muted', text: 'Откройте ссылку и введите код ' + formatRoom(room) + '.' }),
-      h('button', {
-        class: 'btn ghost',
-        type: 'button',
-        text: 'Скопировать ссылку',
-        onClick: function () { copyText(page); }
-      })
-    ]);
-  }
-
-  function hostFallback(room, token) {
-    var page = hostLink(room, token);
-    return h('div', { class: 'join-fallback host-fallback' }, [
-      h('p', { class: 'fallback-title', text: 'Если QR не сработал' }),
-      h('a', { class: 'join-link host', href: page, text: page }),
-      h('p', { class: 'muted', text: 'Откройте эту ссылку на телефоне ведущего.' }),
       h('button', {
         class: 'btn ghost',
         type: 'button',
@@ -327,7 +357,19 @@
     var options = h('div', { class: 'options stack', id: 'options' });
     var board = h('div', { id: 'side-board' });
     setScreen(h('div', { class: 'shell' }, [
-      topbar(screenBar('Вопрос ' + question.number + ' из ' + question.total)),
+      topbar(screenBar(
+        'Вопрос ' + question.number + ' из ' + question.total,
+        '',
+        data.question_phase === 'open'
+          ? h('button', {
+            class: 'btn ghost',
+            id: 'skip-question',
+            type: 'button',
+            text: 'Пропустить',
+            onClick: skipQuestion
+          })
+          : null
+      )),
       h('section', { class: 'stage-live' }, [
         h('div', { class: 'card stage-question' }, [
           meterNode(question.number, question.total),
@@ -430,6 +472,8 @@
     else if (phase !== revealMode) setBlink(showBlink, question.correct_answer);
     var label = document.getElementById('answered-label');
     if (label) label.hidden = true;
+    var skip = document.getElementById('skip-question');
+    if (skip) skip.hidden = true;
     var dock = document.getElementById('count-dock');
     if (dock) dock.classList.toggle('is-on', showCount);
     if (showCount) {
@@ -631,6 +675,8 @@
       if (info) info.textContent = questionCountText(data);
       var grid = document.getElementById('player-grid');
       if (grid) syncPlayers(grid, data.players || []);
+      var start = document.getElementById('start-game');
+      if (start && !actionBusy) start.disabled = !data.player_count;
     } else if (view === 'question') {
       if (data.question_phase === 'closed' || data.question_phase === 'results') {
         beginReveal(data);
