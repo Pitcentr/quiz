@@ -169,6 +169,13 @@ function renderLeaderboard(container, rows, options) {
   });
 }
 
+function medalNode(place) {
+  var kind = place === 1 ? 'gold' : place === 2 ? 'silver' : 'bronze';
+  return h('div', { class: 'medal medal-' + kind, 'aria-hidden': 'true' }, [
+    h('span', { text: String(place) })
+  ]);
+}
+
 function renderPodium(container, rows) {
   clearNode(container);
   var groups = { 1: [], 2: [], 3: [] };
@@ -176,9 +183,9 @@ function renderPodium(container, rows) {
     if (groups[row.place]) groups[row.place].push(row);
   });
   [
-    { place: 2, cls: 'second', label: '2' },
-    { place: 1, cls: 'first', label: '1' },
-    { place: 3, cls: 'third', label: '3' }
+    { place: 2, cls: 'second' },
+    { place: 1, cls: 'first' },
+    { place: 3, cls: 'third' }
   ].forEach(function (slot) {
     var people = groups[slot.place];
     var faces = h('div', { class: 'podium-faces' });
@@ -186,7 +193,7 @@ function renderPodium(container, rows) {
       faces.appendChild(playerAvatar(person.player_id || person.name));
     });
     container.appendChild(h('article', { class: 'podium-slot ' + slot.cls }, [
-      h('div', { class: 'podium-rank', text: people.length ? slot.label : '—' }),
+      medalNode(slot.place),
       people.length ? faces : null,
       h('h3', { text: people.length ? people.map(function (person) { return person.name; }).join(', ') : '—' }),
       h('p', { text: people.length ? people[0].total_score + ' ' + plural(people[0].total_score, 'балл', 'балла', 'баллов') : '' })

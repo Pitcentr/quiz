@@ -13,7 +13,8 @@
   var actionBusy = false;
   var awardedQuestion = '';
   var advanceState = { timer: null, key: '' };
-  var closedBoard = null;
+  var heldQuestion = '';
+  var heldTotals = {};
 
   function stopReveal() {
     if (revealClock) {
@@ -177,7 +178,6 @@
 
   function render(data) {
     closeIfEveryoneAnswered(data, session, refresh);
-    rememberClosedBoard(data);
     armAutoAdvance(advanceState, data, session, refresh);
     var view = viewOf(data);
     var qid = data.question ? data.question.id : '';
@@ -395,14 +395,11 @@
       ])
     ]));
     var closed = data.question_phase === 'closed' || data.question_phase === 'results';
-    var award = closed ? null : awardRowsFor(data);
     paintOptions(options, question, { interactive: false });
-    renderLeaderboard(board, award || (closed ? frozenRows(data) : ratedRows(data)), {
+    renderLeaderboard(board, heldRows(data), {
       scoresOnly: true,
-      showStatus: true,
-      ceremony: !!award
+      showStatus: true
     });
-    if (award) releaseCeremony(board);
     if (closed) beginReveal(data);
     else {
       rememberAnswers(data, true);
@@ -410,14 +407,33 @@
     }
   }
 
-  function frozenRows(data) {
-    var rows = ratedRows(data).map(function (row) {
+  function noteHold(data) {
+    var qid = data.question && data.question.id;
+    if (!qid || awardedQuestion === qid) return;
+    if (heldQuestion !== qid) {
+      heldQuestion = qid;
+      heldTotals = {};
+    }
+    ratedRows(data).forEach(function (row) {
+      if (Object.prototype.hasOwnProperty.call(heldTotals, row.player_id)) return;
       var gained = Number(row.last_points) || 0;
+      heldTotals[row.player_id] = Math.max(0, Number(row.total_score) - gained);
+    });
+  }
+
+  function heldRows(data) {
+    noteHold(data);
+    var qid = data.question && data.question.id;
+    if (qid && awardedQuestion === qid) return ratedRows(data);
+    var rows = ratedRows(data).map(function (row) {
+      var known = Object.prototype.hasOwnProperty.call(heldTotals, row.player_id);
+      var total = known
+        ? heldTotals[row.player_id]
+        : Math.max(0, Number(row.total_score) - (Number(row.last_points) || 0));
       return {
         player_id: row.player_id,
         name: row.name,
-        place: row.place,
-        total_score: Math.max(0, Number(row.total_score) - gained),
+        total_score: total,
         last_points: 0,
         answered: !!row.answered
       };
@@ -435,6 +451,14 @@
       row.place = place;
     });
     return rows;
+  }
+
+  function paintHeld(data) {
+    var side = document.getElementById('side-board');
+    var qid = data.question && data.question.id;
+    if (!side || side.dataset.ceremony) return;
+    if (qid && awardedQuestion === qid) return;
+    renderLeaderboard(side, heldRows(data), { scoresOnly: true, showStatus: true });
   }
 
   function choiceSignature(data) {
@@ -503,6 +527,7 @@
     var first = revealedQuestion !== question.id;
     var facesChanged = first || revealedFaces !== signature;
     if (!facesChanged && revealClock) {
+      paintHeld(data);
       syncReveal(data, false);
       return;
     }
@@ -510,10 +535,6 @@
     revealedFaces = signature;
     if (first) {
       revealMode = '';
-      var side = document.getElementById('side-board');
-      if (side && !side.dataset.ceremony) {
-        renderLeaderboard(side, frozenRows(data), { scoresOnly: true, showStatus: true });
-      }
       var orb = document.getElementById('reveal-count');
       if (orb) delete orb.dataset.ready;
       stopReveal();
@@ -522,61 +543,37 @@
         syncReveal(snapshot, false);
       }, 80);
     }
+    paintHeld(data);
     syncReveal(data, true);
-  }
-
-  function rememberClosedBoard(data) {
-    if (!data || data.status !== 'active' || !data.question) return;
-    if (data.question_phase !== 'closed' && data.question_phase !== 'results') return;
-    closedBoard = {
-      questionId: data.question.id,
-      rows: (data.leaderboard || []).map(function (row) {
-        return {
-          player_id: row.player_id,
-          last_points: Number(row.last_points) || 0
-        };
-      })
-    };
   }
 
   function awardCurrentBoard(data) {
     var qid = data.question && data.question.id;
     var side = document.getElementById('side-board');
     if (!qid || !side || awardedQuestion === qid) return;
-    awardedQuestion = qid;
-    delete side.dataset.ceremony;
-    renderLeaderboard(side, ratedRows(data), {
-      scoresOnly: true,
-      showStatus: true,
-      ceremony: true
-    });
-    releaseCeremony(side);
-  }
-
-  function awardRowsFor(data) {
-    if (awardedQuestion && closedBoard && awardedQuestion === closedBoard.questionId) {
-      closedBoard = null;
-      return null;
-    }
-    if (!closedBoard || !data.question || closedBoard.questionId === data.question.id) return null;
-    var gained = {};
-    var any = false;
-    closedBoard.rows.forEach(function (row) {
-      gained[row.player_id] = row.last_points;
-      if (row.last_points > 0) any = true;
-    });
-    closedBoard = null;
-    if (!any) return null;
-    return ratedRows(data).map(function (row) {
+    noteHold(data);
+    var rows = ratedRows(data).map(function (row) {
+      var from = Object.prototype.hasOwnProperty.call(heldTotals, row.player_id)
+        ? heldTotals[row.player_id]
+        : Math.max(0, Number(row.total_score) - (Number(row.last_points) || 0));
       return {
         player_id: row.player_id,
         name: row.name,
         place: row.place,
-        total_score: row.total_score,
-        last_points: gained[row.player_id] || 0,
+        total_score: Number(row.total_score) || 0,
+        last_points: Math.max(0, (Number(row.total_score) || 0) - from),
         answered: !!row.answered
       };
     });
+    awardedQuestion = qid;
+    delete side.dataset.ceremony;
+    var gained = rows.some(function (row) { return row.last_points > 0; });
+    renderLeaderboard(side, rows, {
+      scoresOnly: true,
+      showStatus: true,
+      ceremony: gained
+    });
+    if (gained) releaseCeremony(side);
   }
 
   function releaseCeremony(container) {
@@ -654,18 +651,14 @@
     document.title = 'КВИЗ · итоги';
     var rows = data.leaderboard || [];
     var podium = h('div', { class: 'podium' });
-    var list = h('div', { id: 'board' });
     setScreen(h('div', { class: 'shell' }, [
-      topbar(screenBar()),
-      h('section', { class: 'final' }, [
-        h('p', { class: 'eyebrow', text: 'Игра окончена' }),
-        h('h1', { text: winnerText(rows) }),
-        podium,
-        list,
+      topbar(screenBar(
+        '',
+        '',
         h('button', {
-          class: 'btn primary',
+          class: 'btn ghost',
           type: 'button',
-          text: 'Создать новую игру',
+          text: 'Новая игра',
           onClick: function () {
             confirmDialog({
               title: 'Создать новую игру?',
@@ -675,6 +668,7 @@
               if (!ok) return;
               if (stopPoll) stopPoll();
               stopPoll = null;
+              clearAutoAdvance(advanceState);
               clearScreenSession();
               session = null;
               snapshot = null;
@@ -682,12 +676,14 @@
             });
           }
         })
+      )),
+      h('section', { class: 'final' }, [
+        h('p', { class: 'eyebrow', text: 'Итоги' }),
+        h('h1', { text: winnerText(rows) }),
+        podium
       ])
     ]));
     renderPodium(podium, rows);
-    var hasAward = !awardedQuestion && rows.some(function (row) { return Number(row.last_points) > 0; });
-    renderLeaderboard(list, rows, { ceremony: hasAward });
-    if (hasAward) releaseCeremony(list);
     showConfetti();
   }
 
@@ -708,8 +704,7 @@
       }
       var label = document.getElementById('answered-label');
       if (label) label.textContent = answeredText(data);
-      var side = document.getElementById('side-board');
-      if (side && !side.dataset.ceremony) renderLeaderboard(side, ratedRows(data), { scoresOnly: true, showStatus: true });
+      paintHeld(data);
       if (data.question) updateMeter(data.question.number, data.question.total);
       rememberAnswers(data, false);
     } else if (view === 'final') {

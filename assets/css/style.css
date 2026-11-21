@@ -547,6 +547,36 @@ h2 { font-size: 28px; margin-bottom: 8px; }
 .podium-slot.second { background: rgba(213, 222, 238, .1); }
 .podium-slot.third { background: rgba(224, 163, 106, .12); }
 .podium-rank { font-size: 42px; font-weight: 800; }
+.medal {
+  width: 72px;
+  height: 72px;
+  margin: 0 auto 8px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  position: relative;
+  font-size: 32px;
+  font-weight: 800;
+  line-height: 1;
+  box-shadow: inset 0 0 0 4px rgba(255, 255, 255, .62), 0 10px 20px rgba(0, 0, 0, .28);
+}
+.medal span { position: relative; z-index: 1; }
+.medal::before, .medal::after {
+  content: '';
+  position: absolute;
+  top: 74%;
+  width: 16px;
+  height: 26px;
+  border-radius: 0 0 5px 5px;
+}
+.medal::before { left: 14px; transform: rotate(16deg); }
+.medal::after { right: 14px; transform: rotate(-16deg); }
+.medal-gold { color: #5a3b04; background: radial-gradient(circle at 35% 30%, #fff, #ffe08a 42%, #e2a31a); }
+.medal-gold::before, .medal-gold::after { background: linear-gradient(#f0c14d, #b57912); }
+.medal-silver { color: #2c3648; background: radial-gradient(circle at 35% 30%, #fff, #e7eef8 46%, #9aabc4); }
+.medal-silver::before, .medal-silver::after { background: linear-gradient(#d5deee, #7e8da8); }
+.medal-bronze { color: #4a2b12; background: radial-gradient(circle at 35% 30%, #fff1e2, #f0c09a 46%, #c47a45); }
+.medal-bronze::before, .medal-bronze::after { background: linear-gradient(#e7b48a, #8d5524); }
 .podium-slot h3 { font-size: clamp(22px, 2vw, 36px); overflow-wrap: anywhere; }
 .podium-slot p { color: var(--muted); margin-bottom: 0; }
 
@@ -633,10 +663,10 @@ input {
   box-shadow: var(--shadow);
 }
 
-.confetti { position: fixed; inset: 0; overflow: hidden; pointer-events: none; z-index: 5; }
+.confetti { position: fixed; inset: 0; overflow: hidden; pointer-events: none; z-index: 25; }
 .confetti i {
   position: absolute;
-  top: -16px;
+  top: -24px;
   width: 8px;
   height: 14px;
   border-radius: 2px;
@@ -662,7 +692,8 @@ input {
   100% { box-shadow: 0 0 0 0 rgba(62, 224, 176, 0); }
 }
 @keyframes fall {
-  to { transform: translateY(105vh) rotate(220deg); }
+  0% { transform: translate3d(0, -10vh, 0) rotate(0deg); }
+  100% { transform: translate3d(var(--drift, 40px), 110vh, 0) rotate(320deg); }
 }
 
 @media (min-width: 1100px) {
@@ -938,12 +969,46 @@ input {
   .page-tv .board-wrap .avatar { width: 24px; height: 24px; }
   .page-tv .board-wrap .lb-name .who { font-size: 17px; }
 
-  .page-tv .final { overflow: auto; text-align: center; }
-  .page-tv .podium { gap: 8px; margin: 4px 0 8px; }
-  .page-tv .podium-slot { min-height: 64px; padding: 8px; border-radius: 14px; }
-  .page-tv .podium-slot.first { min-height: 84px; }
-  .page-tv .podium-rank { font-size: 22px; }
-  .page-tv .podium-slot h3 { font-size: 16px; }
+  .page-tv .final {
+    height: 100%;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    text-align: center;
+  }
+  .page-tv .final h1 { font-size: 22px; margin: 0 0 6px; }
+  .page-tv .final .podium {
+    flex: 1 1 auto;
+    min-height: 0;
+    margin: 0;
+    gap: 10px;
+    align-items: end;
+    grid-template-columns: 1fr 1.15fr 1fr;
+  }
+  .page-tv .final .podium-slot {
+    height: 78%;
+    min-height: 0;
+    padding: 12px 10px 14px;
+    border-radius: 18px;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    align-items: center;
+  }
+  .page-tv .final .podium-slot.first { height: 96%; }
+  .page-tv .final .medal { width: 78px; height: 78px; font-size: 34px; margin-bottom: 6px; }
+  .page-tv .final .podium-slot.first .medal { width: 108px; height: 108px; font-size: 46px; }
+  .page-tv .final .podium-faces .avatar { width: 42px; height: 42px; }
+  .page-tv .final .podium-slot.first .avatar { width: 56px; height: 56px; }
+  .page-tv .final .podium-slot h3 {
+    font-size: 24px;
+    line-height: 1.05;
+    margin: 6px 0 0;
+    max-width: 100%;
+  }
+  .page-tv .final .podium-slot.first h3 { font-size: 32px; }
+  .page-tv .final .podium-slot p { font-size: 16px; font-weight: 800; color: var(--text); }
 }
 
 @media (prefers-reduced-motion: reduce) {

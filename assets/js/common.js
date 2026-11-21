@@ -839,12 +839,16 @@ document.addEventListener('pointerdown', function () {
 function showConfetti() {
   clearConfetti();
   var layer = h('div', { class: 'confetti', 'aria-hidden': 'true' });
-  var colors = ['#ffd56a', '#7c5cff', '#3ee0b0', '#ff5d73', '#8ec5ff'];
-  for (var i = 0; i < 28; i += 1) {
+  var colors = ['#ffd56a', '#7c5cff', '#3ee0b0', '#ff5d73', '#8ec5ff', '#fff4d0', '#ff9f43'];
+  for (var i = 0; i < 90; i += 1) {
     var piece = document.createElement('i');
     piece.style.left = (Math.random() * 100) + '%';
-    piece.style.animationDelay = (Math.random() * 1.2) + 's';
+    piece.style.animationDelay = (Math.random() * 2.8) + 's';
+    piece.style.animationDuration = (2.2 + Math.random() * 2.4) + 's';
     piece.style.background = colors[i % colors.length];
+    piece.style.width = (6 + Math.round(Math.random() * 8)) + 'px';
+    piece.style.height = (10 + Math.round(Math.random() * 14)) + 'px';
+    piece.style.setProperty('--drift', Math.round(Math.random() * 180 - 90) + 'px');
     layer.appendChild(piece);
   }
   document.body.appendChild(layer);
