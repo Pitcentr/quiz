@@ -11,6 +11,7 @@
   var revealedFaces = '';
   var revealMode = '';
   var actionBusy = false;
+  var awardedQuestion = '';
   var advanceState = { timer: null, key: '' };
   var closedBoard = null;
 
@@ -490,6 +491,7 @@
       if (orb && phase === 'countdown') orb.dataset.ready = '1';
     }
     if ((revealMode === '' || revealMode === 'picks') && phase === 'countdown') playGong();
+    if (showBlink && revealMode !== 'blink' && revealMode !== 'done') awardCurrentBoard(data);
     revealMode = phase;
     showAnswered(data);
   }
@@ -508,6 +510,10 @@
     revealedFaces = signature;
     if (first) {
       revealMode = '';
+      var side = document.getElementById('side-board');
+      if (side && !side.dataset.ceremony) {
+        renderLeaderboard(side, frozenRows(data), { scoresOnly: true, showStatus: true });
+      }
       var orb = document.getElementById('reveal-count');
       if (orb) delete orb.dataset.ready;
       stopReveal();
@@ -533,7 +539,25 @@
     };
   }
 
+  function awardCurrentBoard(data) {
+    var qid = data.question && data.question.id;
+    var side = document.getElementById('side-board');
+    if (!qid || !side || awardedQuestion === qid) return;
+    awardedQuestion = qid;
+    delete side.dataset.ceremony;
+    renderLeaderboard(side, ratedRows(data), {
+      scoresOnly: true,
+      showStatus: true,
+      ceremony: true
+    });
+    releaseCeremony(side);
+  }
+
   function awardRowsFor(data) {
+    if (awardedQuestion && closedBoard && awardedQuestion === closedBoard.questionId) {
+      closedBoard = null;
+      return null;
+    }
     if (!closedBoard || !data.question || closedBoard.questionId === data.question.id) return null;
     var gained = {};
     var any = false;
@@ -661,7 +685,7 @@
       ])
     ]));
     renderPodium(podium, rows);
-    var hasAward = rows.some(function (row) { return Number(row.last_points) > 0; });
+    var hasAward = !awardedQuestion && rows.some(function (row) { return Number(row.last_points) > 0; });
     renderLeaderboard(list, rows, { ceremony: hasAward });
     if (hasAward) releaseCeremony(list);
     showConfetti();

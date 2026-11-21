@@ -68,15 +68,20 @@ function renderLeaderboard(container, rows, options) {
   options = options || {};
   if (options.ceremony && container.dataset.ceremony !== 'live') {
     container.dataset.ceremony = 'preview';
-    var preview = (rows || []).map(function (row) {
+    var answeredById = {};
+    (rows || []).forEach(function (row) { answeredById[row.player_id] = row.answered; });
+    var preview = rankedRows((rows || []).map(function (row) {
       return {
         player_id: row.player_id,
         name: row.name,
         total_score: Math.max(0, Number(row.total_score) - Number(row.last_points || 0)),
         last_points: 0
       };
+    })).map(function (row) {
+      row.answered = answeredById[row.player_id];
+      return row;
     });
-    renderLeaderboard(container, rankedRows(preview), {
+    renderLeaderboard(container, preview, {
       compact: options.compact,
       scoresOnly: options.scoresOnly,
       showStatus: options.showStatus
