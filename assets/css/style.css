@@ -780,6 +780,8 @@ input {
     flex: 1 1 auto;
     min-height: 0;
     gap: 6px;
+    padding: 8px;
+    box-sizing: border-box;
   }
   .page-tv .stage-live .opt {
     flex: 1 1 0;
@@ -814,6 +816,8 @@ input {
     overflow: hidden;
     gap: 3px;
     align-content: start;
+    padding: 8px 6px;
+    box-sizing: border-box;
   }
   .page-tv .lb.with-status .lb-head,
   .page-tv .lb.with-status .lb-row,
